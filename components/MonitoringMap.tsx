@@ -4,7 +4,7 @@ import L from 'leaflet';
 // API Configuration
 const API_BASE_URL = "http://localhost:8220/api";
 
-export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
+export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const overlayRef = useRef(null);
@@ -107,7 +107,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
     const signal = controller.signal;
 
     setIsLoadingBorders(true);
-
+    // Reset stats to loading state or keep previous until loaded?
+    // Let's reset to null to indicate loading new area if desired, 
+    // but typically we wait for data. For now, let's keep it null until success.
+    
     try {
         // Clear previous border layers immediately when starting new fetch
         borderLayersRef.current.forEach(layer => layer.remove());
@@ -137,37 +140,62 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
                     const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { signal });
                     const detailJson = await detailRes.json();
                     
-                    if (detailJson.success && detailJson.data.members) {
-                        detailJson.data.members.forEach((m) => {
-                            if (m.geometry && m.geometry.length > 1) {
-                                const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
-                                
-                                const polyline = L.polyline(latlngs, {
-                                    color: "red",
-                                    weight: 2
-                                }).addTo(map);
-                                
-                                borderLayersRef.current.push(polyline);
-                            }
-                        });
+                    if (detailJson.success && detailJson.data) {
+                        // Draw Polygon
+                        if (detailJson.data.members) {
+                            detailJson.data.members.forEach((m) => {
+                                if (m.geometry && m.geometry.length > 1) {
+                                    const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
+                                    const polyline = L.polyline(latlngs, {
+                                        color: "red",
+                                        weight: 2
+                                    }).addTo(map);
+                                    borderLayersRef.current.push(polyline);
+                                }
+                            });
+                        }
+                        
+                        // Extract Population
+                        let pop = 0;
+                        if (detailJson.data.tags && detailJson.data.tags.population) {
+                            // Clean string (e.g., remove commas if any) and parse
+                            const rawPop = detailJson.data.tags.population.toString().replace(/,/g, '');
+                            pop = parseInt(rawPop, 10);
+                            if (isNaN(pop)) pop = 0;
+                        }
+                        return pop;
                     }
                 } catch (err) {
                     if (err.name !== 'AbortError') {
                         console.error(`Failed to fetch details for ward ${ward.id}`, err);
                     }
                 }
+                return 0; // Return 0 if failed
             });
 
-            await Promise.all(fetchPromises);
-            console.log("Finished drawing borders");
+            // Wait for all requests
+            const populations = await Promise.all(fetchPromises);
+            
+            // Calculate Total Population
+            const totalPopulation = populations.reduce((sum, current) => sum + current, 0);
+
+            // Update Stats with Real Population + Mock Data for others
+            if (onStatsUpdate) {
+                onStatsUpdate({
+                    population: totalPopulation,
+                    avgFloodLevel: (0.5 + Math.random() * 1.5).toFixed(1), // Mock: 0.5 - 2.0m
+                    food: (totalPopulation * 0.05 / 1000).toFixed(1), // Mock: ~0.05kg per person, converted to tons
+                    workers: Math.floor(totalPopulation / 500) + 20 // Mock: 1 worker per 500 people + base team
+                });
+            }
+
+            console.log("Finished drawing borders and calculating stats");
         }
     } catch (error) {
         if (error.name === 'AbortError') {
             console.log("Previous API call cancelled");
         } else {
             console.error("Error fetching borders:", error);
-            // Optional: Alert user if API fails
-            // alert("Failed to load borders");
         }
     } finally {
         // Only turn off loading if this is the latest request
@@ -401,6 +429,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
                     // Abort any ongoing calls
                     if (abortControllerRef.current) {
                         abortControllerRef.current.abort();
+                    }
+                    // Reset stats
+                    if (onStatsUpdate) {
+                        onStatsUpdate(null);
                     }
                   }}
                   className="ml-auto hover:bg-gray-100 rounded p-0.5 transition-colors"

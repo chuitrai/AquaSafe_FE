@@ -13,6 +13,7 @@ const initialZones = [
 
 export const MonitoringDashboard = () => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
+  const [currentStats, setCurrentStats] = useState(null);
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -29,10 +30,11 @@ export const MonitoringDashboard = () => {
                     zones={[]} 
                     selectedZoneId={selectedZoneId} 
                     onZoneSelect={setSelectedZoneId}
+                    onStatsUpdate={setCurrentStats}
                 />
             </div>
             <div className="flex-shrink-0 bg-background-light border-t border-gray-200 p-4 z-10">
-                <MonitoringStats />
+                <MonitoringStats data={currentStats} />
             </div>
         </div>
       </main>
