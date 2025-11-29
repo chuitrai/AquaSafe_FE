@@ -11,7 +11,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
   const markersRef = useRef({});
   const selectionRectRef = useRef(null); // Ref for the rectangle layer
   const borderLayersRef = useRef([]); // Ref to store drawn API border layers
-  
+  const abortControllerRef = useRef(null); // Ref to manage API cancellation
+
   const [isInteracting, setIsInteracting] = useState(false);
   const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
@@ -84,6 +85,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
@@ -92,10 +96,20 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new controller for this request
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const signal = controller.signal;
+
     setIsLoadingBorders(true);
 
     try {
-        // Clear previous border layers
+        // Clear previous border layers immediately when starting new fetch
         borderLayersRef.current.forEach(layer => layer.remove());
         borderLayersRef.current = [];
 
@@ -111,7 +125,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
         const res = await fetch(`${API_BASE_URL}/admin/selected-area`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal // Pass signal
         });
         const json = await res.json();
 
@@ -119,7 +134,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
             // 2. Loop through IDs and fetch details for each
             const fetchPromises = json.data.wards.map(async (ward) => {
                 try {
-                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`);
+                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { signal });
                     const detailJson = await detailRes.json();
                     
                     if (detailJson.success && detailJson.data.members) {
@@ -137,7 +152,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
                         });
                     }
                 } catch (err) {
-                    console.error(`Failed to fetch details for ward ${ward.id}`, err);
+                    if (err.name !== 'AbortError') {
+                        console.error(`Failed to fetch details for ward ${ward.id}`, err);
+                    }
                 }
             });
 
@@ -145,11 +162,19 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
             console.log("Finished drawing borders");
         }
     } catch (error) {
-        console.error("Error fetching borders:", error);
-        // Optional: Alert user if API fails
-        // alert("Failed to load borders");
+        if (error.name === 'AbortError') {
+            console.log("Previous API call cancelled");
+        } else {
+            console.error("Error fetching borders:", error);
+            // Optional: Alert user if API fails
+            // alert("Failed to load borders");
+        }
     } finally {
-        setIsLoadingBorders(false);
+        // Only turn off loading if this is the latest request
+        if (abortControllerRef.current === controller) {
+            setIsLoadingBorders(false);
+            abortControllerRef.current = null;
+        }
     }
   };
 
@@ -223,6 +248,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
 
         // Trigger API Call
         fetchAndDrawBorders(bounds);
+        
+        // EXIT SELECTION MODE IMMEDIATELY
+        setIsSelectionMode(false);
       }
     };
 
@@ -370,6 +398,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
                     // Clear borders
                     borderLayersRef.current.forEach(layer => layer.remove());
                     borderLayersRef.current = [];
+                    // Abort any ongoing calls
+                    if (abortControllerRef.current) {
+                        abortControllerRef.current.abort();
+                    }
                   }}
                   className="ml-auto hover:bg-gray-100 rounded p-0.5 transition-colors"
                 >
