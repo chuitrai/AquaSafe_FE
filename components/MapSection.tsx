@@ -30,7 +30,7 @@ export const MapSection = () => {
         <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm p-3 rounded-md shadow-md text-xs">
             <div className="flex items-center gap-2 mb-1">
                 <div className="w-3 h-3 rounded-full bg-[#004d7a]"></div>
-                <span>Ngập sâu (>50cm)</span>
+                <span>Ngập sâu (&gt;50cm)</span>
             </div>
             <div className="flex items-center gap-2 mb-1">
                 <div className="w-3 h-3 rounded-full bg-[#0077C2]"></div>
