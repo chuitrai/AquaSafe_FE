@@ -1,0 +1,122 @@
+import React, { useState } from 'react';
+
+export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="relative h-full shrink-0 z-20">
+      <aside className={`h-full flex flex-col border-r border-gray-200 bg-white transition-all duration-300 ${collapsed ? 'w-0 overflow-hidden border-none' : 'w-80'}`}>
+        
+        {/* Filters & Layers */}
+        <div className="p-4 border-b border-gray-200 flex flex-col gap-4 bg-white z-10">
+          <div className="flex gap-2">
+             <button className="flex-1 flex items-center justify-between py-2 px-3 text-xs font-semibold border border-gray-300 bg-white rounded-md hover:bg-gray-50 shadow-sm transition-all text-gray-700">
+                <span>Khu vực</span>
+                <span className="material-symbols-outlined !text-[18px] text-gray-400">arrow_drop_down</span>
+             </button>
+             <button className="flex-1 flex items-center justify-between py-2 px-3 text-xs font-semibold border border-gray-300 bg-white rounded-md hover:bg-gray-50 shadow-sm transition-all text-gray-700">
+                <span>Mức độ</span>
+                <span className="material-symbols-outlined !text-[18px] text-gray-400">arrow_drop_down</span>
+             </button>
+          </div>
+           <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Lớp bản đồ</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {['Khu dân cư', 'Đội cứu hộ', 'Điểm cứu trợ'].map((label) => (
+                    <label key={label} className="flex items-center gap-2 cursor-pointer group select-none">
+                      <div className="relative flex items-center">
+                        <input className="peer h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer" type="checkbox" defaultChecked/>
+                      </div>
+                      <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">{label}</span>
+                    </label>
+                ))}
+              </div>
+            </div>
+        </div>
+
+        {/* Zones List Area */}
+        <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+            <div className="flex items-center gap-2 mb-3 pl-1">
+              <span className="material-symbols-outlined text-primary !text-[22px]">warning</span>
+              <h2 className="font-bold text-gray-800 text-base">Vùng cảnh báo</h2>
+              <span className="ml-auto text-xs font-bold text-primary bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">{zones.length}</span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+                {zones.map(zone => (
+                  <div 
+                    key={zone.id} 
+                    onClick={() => onZoneSelect(zone.id)}
+                    className={`group relative rounded-lg border p-3.5 transition-all hover:shadow-md cursor-pointer ${
+                      selectedZoneId === zone.id 
+                        ? 'border-primary bg-blue-50/40 ring-1 ring-primary shadow-sm' 
+                        : 'border-gray-200 bg-white hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="pr-2">
+                        <h3 className="font-bold text-gray-800 text-sm leading-tight mb-1 group-hover:text-primary transition-colors">{zone.location}</h3>
+                        <p className="text-xs text-gray-500 font-medium">{zone.district}</p>
+                      </div>
+                      <div className={`flex flex-col items-end shrink-0 ${
+                        zone.severity === 'critical' ? 'text-red-600' : zone.severity === 'high' ? 'text-orange-600' : 'text-blue-600'
+                      }`}>
+                        <span className="font-bold text-lg leading-none">{zone.level}m</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 border-dashed">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <span className="material-symbols-outlined !text-[14px]">schedule</span>
+                            <span>{zone.updated}</span>
+                        </div>
+                        <div className={`flex items-center gap-1 text-xs font-semibold ${
+                             zone.status === 'rising' ? 'text-red-500' : 
+                             zone.status === 'falling' ? 'text-green-500' : 'text-gray-500'
+                        }`}>
+                            {zone.status === 'rising' ? 'Nước lên' : zone.status === 'falling' ? 'Nước rút' : 'Ổn định'}
+                            <span className="material-symbols-outlined !text-[16px]">
+                                {zone.status === 'rising' ? 'trending_up' : zone.status === 'falling' ? 'trending_down' : 'trending_flat'}
+                            </span>
+                        </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+        </div>
+
+        {/* Legend */}
+        <div className="p-3 border-t border-gray-200 bg-gray-50/50 shrink-0">
+            <p className="text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-wide">Chú giải mức độ ngập</p>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                 <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6] ring-1 ring-white shadow-sm"></span>
+                    <span className="text-xs text-gray-600">Nhẹ (&lt;0.5m)</span>
+                 </div>
+                 <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#facc15] ring-1 ring-white shadow-sm"></span>
+                    <span className="text-xs text-gray-600">Trung bình</span>
+                 </div>
+                 <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#f97316] ring-1 ring-white shadow-sm"></span>
+                    <span className="text-xs text-gray-600">Cao (1.2-2m)</span>
+                 </div>
+                 <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] ring-1 ring-white shadow-sm"></span>
+                    <span className="text-xs text-gray-600">Nguy hiểm</span>
+                 </div>
+            </div>
+        </div>
+      </aside>
+
+      {/* Toggle Button */}
+      <button 
+        onClick={() => setCollapsed(!collapsed)}
+        className="absolute top-1/2 -translate-y-1/2 left-full z-30 h-12 w-6 rounded-r-lg border-y border-r border-gray-200 bg-white shadow-sm flex items-center justify-center text-gray-400 hover:text-primary hover:bg-gray-50 transition-all cursor-pointer focus:outline-none"
+        title={collapsed ? "Mở rộng" : "Thu gọn"}
+      >
+        <span className="material-symbols-outlined !text-[20px]">{collapsed ? 'chevron_right' : 'chevron_left'}</span>
+      </button>
+    </div>
+  );
+};

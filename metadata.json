@@ -1,0 +1,5 @@
+{
+  "name": "AquaSafe Flood Monitoring",
+  "description": "A comprehensive dashboard for monitoring flood levels, affected populations, and relief efforts using real-time data visualization.",
+  "requestFramePermissions": []
+}
