@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 
 // Declare global Leaflet type to avoid TS errors without installing types
@@ -8,14 +7,19 @@ declare global {
   }
 }
 
+// API Configuration
+const API_BASE_URL = "http://localhost:8220/api";
+
 export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const overlayRef = useRef(null);
   const markersRef = useRef({});
   const selectionRectRef = useRef(null); // Ref for the rectangle layer
+  const borderLayersRef = useRef([]); // Ref to store drawn API border layers
   
   const [isInteracting, setIsInteracting] = useState(false);
+  const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
   // Selection Tool State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -91,6 +95,71 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
     };
   }, []);
 
+  // Function to fetch and draw borders based on bounds
+  const fetchAndDrawBorders = async (bounds) => {
+    const L = window.L;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    setIsLoadingBorders(true);
+
+    try {
+        // Clear previous border layers
+        borderLayersRef.current.forEach(layer => layer.remove());
+        borderLayersRef.current = [];
+
+        // Prepare payload
+        const payload = {
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            west: bounds.getWest()
+        };
+
+        // 1. Call API to get IDs
+        const res = await fetch(`${API_BASE_URL}/admin/selected-area`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+
+        if (json.success && json.data.wards) {
+            // 2. Loop through IDs and fetch details for each
+            const fetchPromises = json.data.wards.map(async (ward) => {
+                try {
+                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`);
+                    const detailJson = await detailRes.json();
+                    
+                    if (detailJson.success && detailJson.data.members) {
+                        detailJson.data.members.forEach((m) => {
+                            if (m.geometry && m.geometry.length > 1) {
+                                const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
+                                
+                                const polyline = L.polyline(latlngs, {
+                                    color: "red",
+                                    weight: 2
+                                }).addTo(map);
+                                
+                                borderLayersRef.current.push(polyline);
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Failed to fetch details for ward ${ward.id}`, err);
+                }
+            });
+
+            await Promise.all(fetchPromises);
+            console.log("Finished drawing borders");
+        }
+    } catch (error) {
+        console.error("Error fetching borders:", error);
+    } finally {
+        setIsLoadingBorders(false);
+    }
+  };
+
   // Handle Selection Mode Logic
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -159,6 +228,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
           nw: { lat: northWest.lat.toFixed(5), lng: northWest.lng.toFixed(5) },
           se: { lat: southEast.lat.toFixed(5), lng: southEast.lng.toFixed(5) }
         });
+
+        // Trigger API Call
+        fetchAndDrawBorders(bounds);
       }
     };
 
@@ -281,6 +353,14 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
             <span className="material-symbols-outlined !text-[16px] animate-spin">sync</span>
             Rendering Flood Layer (TFT/TFW)
         </div>
+        
+        {/* Loading Indicator for API */}
+        {isLoadingBorders && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-600/90 text-white backdrop-blur px-4 py-2 rounded-full shadow-md text-xs font-bold flex items-center gap-2 z-[1000] pointer-events-none animate-bounce">
+                <span className="material-symbols-outlined !text-[16px] animate-spin">downloading</span>
+                Loading Boarders...
+            </div>
+        )}
 
         {/* Coordinates Display (Selection Result) */}
         {selectionCoords && (
@@ -291,10 +371,14 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
                 <button 
                   onClick={() => {
                     setSelectionCoords(null);
+                    // Clear rectangle
                     if(selectionRectRef.current) {
                       selectionRectRef.current.remove();
                       selectionRectRef.current = null;
                     }
+                    // Clear borders
+                    borderLayersRef.current.forEach(layer => layer.remove());
+                    borderLayersRef.current = [];
                   }}
                   className="ml-auto hover:bg-gray-100 rounded p-0.5 transition-colors"
                 >
