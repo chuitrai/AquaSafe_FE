@@ -1,11 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-
-// Declare global Leaflet type to avoid TS errors without installing types
-declare global {
-  interface Window {
-    L: any;
-  }
-}
+import L from 'leaflet';
 
 // API Configuration
 const API_BASE_URL = "http://localhost:8220/api";
@@ -30,8 +24,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
-
-    const L = window.L;
 
     // 1. Create Map Instance centered on Ho Chi Minh City
     const map = L.map(mapContainerRef.current, {
@@ -97,7 +89,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
 
   // Function to fetch and draw borders based on bounds
   const fetchAndDrawBorders = async (bounds) => {
-    const L = window.L;
     const map = mapInstanceRef.current;
     if (!map) return;
 
@@ -155,6 +146,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
         }
     } catch (error) {
         console.error("Error fetching borders:", error);
+        // Optional: Alert user if API fails
+        // alert("Failed to load borders");
     } finally {
         setIsLoadingBorders(false);
     }
@@ -164,7 +157,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    const L = window.L;
 
     if (isSelectionMode) {
       map.dragging.disable(); // Disable panning while selecting
@@ -249,7 +241,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    const L = window.L;
 
     // Clear existing markers
     Object.values(markersRef.current).forEach((marker: any) => marker.remove());
@@ -405,7 +396,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
             </button>
             <div className="absolute left-0 top-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 group-hover:translate-x-14 pt-0">
                 <div className="flex w-72 flex-col gap-3 rounded-xl bg-white/95 p-4 text-gray-800 shadow-xl backdrop-blur-sm ring-1 ring-black/5">
-                    {/* ... Weather content same as before ... */}
                      <div className="flex items-start justify-between">
                         <div>
                             <p className="font-bold text-lg leading-tight">Quận 7, TP.HCM</p>
@@ -416,7 +406,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect }) => {
                             <p className="text-3xl font-bold text-gray-800">28°C</p>
                         </div>
                     </div>
-                    {/* Simplified for brevity in this update, keeping layout intact */}
                      <div className="grid grid-cols-3 gap-2 text-xs mt-1">
                         <div className="flex flex-col items-center gap-1 text-center p-2 bg-blue-50 rounded-lg">
                             <span className="material-symbols-outlined text-blue-500 !text-[18px]">water_drop</span>
