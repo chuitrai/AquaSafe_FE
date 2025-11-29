@@ -47,7 +47,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     // 4. Implement "Lazy Render" Overlay for TFT/TFW simulation
     const imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Red_hot_heatmap.png/640px-Red_hot_heatmap.png'; 
-    const imageBounds = [[10.68, 106.55], [10.88, 106.80]];
+    const imageBounds: L.LatLngBoundsExpression = [[10.68, 106.55], [10.88, 106.80]];
     
     const overlay = L.imageOverlay(imageUrl, imageBounds, {
       opacity: 0.2, 
@@ -163,27 +163,49 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             pop = parseInt(rawPop, 10);
                             if (isNaN(pop)) pop = 0;
                         }
-                        return pop;
+
+                        // Extract Flood Depth
+                        let depth = 0;
+                        if (detailJson.data.tags && detailJson.data.tags.flood_depth) {
+                            depth = parseFloat(detailJson.data.tags.flood_depth);
+                            if (isNaN(depth)) depth = 0;
+                        }
+
+                        return { pop, depth };
                     }
                 } catch (err) {
                     if (err.name !== 'AbortError') {
                         console.error(`Failed to fetch details for ward ${ward.id}`, err);
                     }
                 }
-                return 0; // Return 0 if failed
+                return { pop: 0, depth: 0 }; // Return 0s if failed
             });
 
             // Wait for all requests
-            const populations = await Promise.all(fetchPromises);
+            const results = await Promise.all(fetchPromises);
             
             // Calculate Total Population
-            const totalPopulation = populations.reduce((sum, current) => sum + current, 0);
+            const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
 
-            // Update Stats with Real Population + Mock Data for others
+            // Calculate Flood Depth (Accumulate for Average)
+            const totalFloodDepth = results.reduce((sum, current) => sum + current.depth, 0);
+            
+            // Calculate Average Flood Depth for the selected area
+            // If we have wards, we average the depth. If user meant sum of depths, we can just use totalFloodDepth.
+            // Given "Độ ngập TB" (Average Flood Level) in UI, we should divide by count.
+            const validDepthsCount = results.filter(r => r.depth > 0).length;
+            const denominator = validDepthsCount > 0 ? validDepthsCount : (results.length > 0 ? results.length : 1);
+            
+            // NOTE: If the requirement is STRICTLY "cộng lại" (sum up) for the dashboard value, use totalFloodDepth.
+            // But usually "Level" implies a height, so sum of heights across area is weird. 
+            // I will use Average for the "TB" (Trung Bình) label in stats.
+            const avgFloodDepth = (totalFloodDepth / denominator).toFixed(2);
+
+            // Update Stats with Real Population + Real Flood Depth + Mock Data for others
             if (onStatsUpdate) {
                 onStatsUpdate({
                     population: totalPopulation,
-                    avgFloodLevel: (0.5 + Math.random() * 1.5).toFixed(1), // Mock: 0.5 - 2.0m
+                    avgFloodLevel: avgFloodDepth, 
                     food: (totalPopulation * 0.05 / 1000).toFixed(1), // Mock: ~0.05kg per person, converted to tons
                     workers: Math.floor(totalPopulation / 500) + 20 // Mock: 1 worker per 500 people + base team
                 });
