@@ -8,7 +8,7 @@ const TIME_OPTIONS = [
     { id: 'future-60', label: '1 giờ tới' },
 ];
 
-export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange }) => {
+export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange, isLoggedIn, onLoginToggle }) => {
   const isMonitoring = currentView === 'monitoring';
   
   // Search State
@@ -100,18 +100,22 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
             <span className="material-symbols-outlined !text-[20px]">dashboard</span>
             <span>Bảng điều khiển</span>
           </button>
-          <button 
-            onClick={() => onViewChange('analysis')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${!isMonitoring ? 'bg-primary-light text-primary ring-1 ring-primary/20' : 'text-text-secondary hover:bg-white/60'}`}
-          >
-            <span className="material-symbols-outlined !text-[20px]">pie_chart</span>
-            <span>Phân tích dữ liệu</span>
-          </button>
+          
+          {/* Only show Analysis tab if Logged In */}
+          {isLoggedIn && (
+            <button 
+                onClick={() => onViewChange('analysis')}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${!isMonitoring ? 'bg-primary-light text-primary ring-1 ring-primary/20' : 'text-text-secondary hover:bg-white/60'}`}
+            >
+                <span className="material-symbols-outlined !text-[20px]">pie_chart</span>
+                <span>Phân tích dữ liệu</span>
+            </button>
+          )}
         </nav>
       </div>
       
       <div className="flex items-center gap-4 flex-1 justify-end">
-        {/* Search Bar */}
+        {/* Search Bar - Visible to everyone in Monitoring view */}
         {isMonitoring && (
           <>
             <div className="relative w-full max-w-sm hidden lg:block" ref={searchRef}>
@@ -190,24 +194,46 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
               )}
             </div>
 
-            <button className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 shadow-sm relative">
-              <span className="material-symbols-outlined text-gray-600 !text-[22px]">notifications</span>
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
+            {/* Notifications - Only for logged in users */}
+            {isLoggedIn && (
+                <button className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 shadow-sm relative">
+                <span className="material-symbols-outlined text-gray-600 !text-[22px]">notifications</span>
+                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                </button>
+            )}
           </>
         )}
 
+        {/* User Profile / Login Toggle */}
         <div className={`flex items-center gap-3 ${isMonitoring ? '' : 'pl-6 border-l border-gray-200'}`}>
-          {!isMonitoring && (
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-text-primary">Nguyễn Văn A</p>
-              <p className="text-xs text-text-secondary">Cán bộ quản lý</p>
-            </div>
+          {isLoggedIn ? (
+             <>
+                {!isMonitoring && (
+                    <div className="text-right hidden sm:block">
+                    <p className="text-sm font-bold text-text-primary">Nguyễn Văn A</p>
+                    <p className="text-xs text-text-secondary">Cán bộ quản lý</p>
+                    </div>
+                )}
+                <div 
+                    onClick={onLoginToggle}
+                    title="Đăng xuất"
+                    className="h-10 w-10 rounded-full bg-gray-200 bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:ring-2 hover:ring-primary transition-all relative group" 
+                    style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBP4CjPHfWhxzZ6Owv73OKeCoYsi39uDcJsL-DJvklcX-8Gkg4tdSHnUDWF4LKRLb-KmTGh4ID6C9UAWhw-kTyYiJxFBwclwf949IlgpBglZx6kgwtit6plHUklAKQQOwj8IiePVfbYezhIw2Q5WemGrOj04giWpiX2Xhhcf4XIV36KhsM3klY8Ldmo2XppH6_4oicxoetMHhPslTKD87FX7uACtsg6aXWIVWoeksZbrQip7k6nusOj7I1q-cNBLRCx8vBfDsBI0miJ")' }}
+                >
+                    <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="material-symbols-outlined text-white !text-[20px]">logout</span>
+                    </div>
+                </div>
+             </>
+          ) : (
+            <button 
+                onClick={onLoginToggle}
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors"
+            >
+                <span className="material-symbols-outlined !text-[20px]">login</span>
+                <span>Đăng nhập</span>
+            </button>
           )}
-          <div 
-            className="h-10 w-10 rounded-full bg-gray-200 bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:ring-2 hover:ring-primary transition-all" 
-            style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBP4CjPHfWhxzZ6Owv73OKeCoYsi39uDcJsL-DJvklcX-8Gkg4tdSHnUDWF4LKRLb-KmTGh4ID6C9UAWhw-kTyYiJxFBwclwf949IlgpBglZx6kgwtit6plHUklAKQQOwj8IiePVfbYezhIw2Q5WemGrOj04giWpiX2Xhhcf4XIV36KhsM3klY8Ldmo2XppH6_4oicxoetMHhPslTKD87FX7uACtsg6aXWIVWoeksZbrQip7k6nusOj7I1q-cNBLRCx8vBfDsBI0miJ")' }}
-          ></div>
         </div>
       </div>
     </header>

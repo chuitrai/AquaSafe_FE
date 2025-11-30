@@ -207,9 +207,9 @@ export const FloodMonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStat
 
       const bounds = L.latLngBounds(e.latlng, e.latlng);
       selectionRectRef.current = L.rectangle(bounds, {
-        color: "#0077C2", 
+        color: "#c20000ff", 
         weight: 2,
-        fillColor: "#0077C2",
+        fillColor: "#c25100ff",
         fillOpacity: 0.2,
         dashArray: '5, 5'
       }).addTo(map);

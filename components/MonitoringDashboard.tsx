@@ -11,12 +11,12 @@ const initialZones = [
   { id: 5, x: 80, y: 25, severity: 'medium', location: 'Đường số 10', district: 'TP. Thủ Đức', level: 0.4, updated: '1h trước', status: 'falling' },
 ];
 
-export const MonitoringDashboard = ({ searchLocation, timeFrame }) => {
+export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [currentStats, setCurrentStats] = useState(null);
   
-  // State for map layers (default checked)
-  const [activeLayers, setActiveLayers] = useState(['Khu dân cư', 'Đội cứu hộ']);
+  // State for map layers (default checked) - Removed 'Khu dân cư'
+  const [activeLayers, setActiveLayers] = useState(['Đội cứu hộ', 'Điểm cứu trợ']);
 
   const toggleLayer = (layerName) => {
     setActiveLayers(prev => 
@@ -49,9 +49,12 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame }) => {
                     activeLayers={activeLayers}
                 />
             </div>
-            <div className="flex-shrink-0 bg-background-light border-t border-gray-200 p-4 z-10">
-                <MonitoringStats data={currentStats} />
-            </div>
+            {/* Only show Stats if User is Logged In */}
+            {isLoggedIn && (
+                <div className="flex-shrink-0 bg-background-light border-t border-gray-200 p-4 z-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <MonitoringStats data={currentStats} />
+                </div>
+            )}
         </div>
       </main>
     </div>

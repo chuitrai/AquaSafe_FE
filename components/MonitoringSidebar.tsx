@@ -10,19 +10,29 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
         {/* Filters & Layers */}
         <div className="p-4 border-b border-gray-200 flex flex-col gap-4 bg-white z-10">
           <div className="flex gap-2">
-             <button className="flex-1 flex items-center justify-between py-2 px-3 text-xs font-semibold border border-gray-300 bg-white rounded-md hover:bg-gray-50 shadow-sm transition-all text-gray-700">
-                <span>Khu vực</span>
-                <span className="material-symbols-outlined !text-[18px] text-gray-400">arrow_drop_down</span>
-             </button>
-             <button className="flex-1 flex items-center justify-between py-2 px-3 text-xs font-semibold border border-gray-300 bg-white rounded-md hover:bg-gray-50 shadow-sm transition-all text-gray-700">
-                <span>Mức độ</span>
-                <span className="material-symbols-outlined !text-[18px] text-gray-400">arrow_drop_down</span>
-             </button>
+             <div className="relative flex-1">
+                 <select className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-xs font-semibold text-gray-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+                    <option>Hồ Chí Minh</option>
+                    <option>Hà Nội</option>
+                    <option>Đà Nẵng</option>
+                 </select>
+                 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 !text-[18px] text-gray-500 pointer-events-none">arrow_drop_down</span>
+             </div>
+             
+             <div className="relative flex-1">
+                 <select className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-xs font-semibold text-gray-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+                    <option>Tất cả mức độ</option>
+                    <option>Nguy hiểm</option>
+                    <option>Cao</option>
+                    <option>Trung bình</option>
+                 </select>
+                 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 !text-[18px] text-gray-500 pointer-events-none">arrow_drop_down</span>
+             </div>
           </div>
            <div className="flex flex-col gap-2">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Lớp bản đồ</p>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
-                {['Khu dân cư', 'Đội cứu hộ', 'Điểm cứu trợ'].map((label) => (
+                {['Đội cứu hộ', 'Điểm cứu trợ'].map((label) => (
                     <label key={label} className="flex items-center gap-2 cursor-pointer group select-none">
                       <div className="relative flex items-center">
                         <input 

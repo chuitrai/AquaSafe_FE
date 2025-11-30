@@ -21,12 +21,21 @@ const MOCK_RESCUE_TEAMS = [
     { id: 'R4', x: 65, y: 60, name: "Đội Hậu Cần", status: "idle" }
 ];
 
+// Mock Relief Points (Shelters, Food Distribution)
+const MOCK_RELIEF_POINTS = [
+    { id: 'P1', x: 50, y: 35, name: "UBND Phường 22", type: "shelter", capacity: "150/200" },
+    { id: 'P2', x: 75, y: 45, name: "Trường THPT Thảo Điền", type: "shelter", capacity: "50/500" },
+    { id: 'P3', x: 35, y: 65, name: "Điểm phát lương thực Q7", type: "food", capacity: "Còn 500 suất" },
+    { id: 'P4', x: 58, y: 25, name: "Trạm Y Tế Phường 15", type: "medical", capacity: "Sẵn sàng" }
+];
+
 export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame, activeLayers }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const overlayRef = useRef(null);
   const markersRef = useRef({});
   const rescueMarkersRef = useRef([]); // Store rescue team markers
+  const reliefMarkersRef = useRef([]); // Store relief point markers
   const selectionRectRef = useRef(null); // Ref for the rectangle layer
   const borderLayersRef = useRef([]); // Ref to store drawn API border layers
   const abortControllerRef = useRef(null); // Ref to manage API cancellation
@@ -112,12 +121,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     }
   }, [selectedZoneId, zones]);
 
-  // Handle Rescue Team Layer
+  // Handle Rescue Team & Relief Point Layers
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Clear existing rescue markers
+    // 1. Manage Rescue Teams
     rescueMarkersRef.current.forEach(m => m.remove());
     rescueMarkersRef.current = [];
 
@@ -154,6 +163,55 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
             
             rescueMarkersRef.current.push(marker);
+        });
+    }
+
+    // 2. Manage Relief Points
+    reliefMarkersRef.current.forEach(m => m.remove());
+    reliefMarkersRef.current = [];
+
+    if (activeLayers && activeLayers.includes('Điểm cứu trợ')) {
+        MOCK_RELIEF_POINTS.forEach(point => {
+            const [lat, lng] = getZoneLatLng(point.x, point.y);
+            
+            let iconName = 'home';
+            let bgClass = 'bg-blue-600';
+            if (point.type === 'food') { iconName = 'inventory_2'; bgClass = 'bg-green-600'; }
+            if (point.type === 'medical') { iconName = 'medical_services'; bgClass = 'bg-red-500'; }
+            
+            const iconHtml = `
+                <div class="relative flex items-center justify-center">
+                     <div class="w-7 h-7 rounded-full shadow-lg border-2 border-white ${bgClass} flex items-center justify-center">
+                        <span class="material-symbols-outlined !text-[16px] text-white">${iconName}</span>
+                    </div>
+                    <div class="absolute -bottom-1 w-2 h-2 bg-white rotate-45 border-r border-b border-gray-200"></div>
+                </div>
+            `;
+
+            const icon = L.divIcon({
+                html: iconHtml,
+                className: 'custom-div-icon',
+                iconSize: [28, 28],
+                iconAnchor: [14, 30]
+            });
+
+            const marker = L.marker([lat, lng], { icon }).addTo(map);
+
+            const popupContent = `
+                <div class="font-sans min-w-[140px]">
+                    <div class="flex items-center gap-1 mb-1">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-white ${bgClass}">
+                            ${point.type === 'shelter' ? 'Lưu trú' : point.type === 'food' ? 'Lương thực' : 'Y tế'}
+                        </span>
+                    </div>
+                    <h4 class="font-bold text-sm text-gray-800 mb-0.5">${point.name}</h4>
+                    <p class="text-xs text-gray-600 font-medium">Sức chứa/Tình trạng:</p>
+                    <p class="text-xs font-bold text-gray-800">${point.capacity}</p>
+                </div>
+            `;
+            marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
+
+            reliefMarkersRef.current.push(marker);
         });
     }
 
@@ -256,7 +314,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     }
   };
 
-  // Function to calculate region flood depth (Returns data, does NOT set state directly)
+  // Function to calculate region flood depth
   const calculateRegionFloodDepth = async (bounds) => {
     try {
       const payload = {
