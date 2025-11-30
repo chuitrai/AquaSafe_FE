@@ -14,6 +14,17 @@ const initialZones = [
 export const MonitoringDashboard = ({ searchLocation, timeFrame }) => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [currentStats, setCurrentStats] = useState(null);
+  
+  // State for map layers (default checked)
+  const [activeLayers, setActiveLayers] = useState(['Khu dân cư', 'Đội cứu hộ']);
+
+  const toggleLayer = (layerName) => {
+    setActiveLayers(prev => 
+      prev.includes(layerName) 
+        ? prev.filter(l => l !== layerName) 
+        : [...prev, layerName]
+    );
+  };
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -21,18 +32,21 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame }) => {
         zones={initialZones} 
         selectedZoneId={selectedZoneId} 
         onZoneSelect={setSelectedZoneId}
+        activeLayers={activeLayers}
+        onToggleLayer={toggleLayer}
       />
       
       <main className="relative flex flex-1 flex-col bg-gray-100 peer-focus-within:opacity-50 transition-opacity duration-300">
         <div className="relative flex-1 w-full h-full flex flex-col">
             <div className="flex-1 relative min-h-0">
                 <MonitoringMap 
-                    zones={[]} 
+                    zones={initialZones} 
                     selectedZoneId={selectedZoneId} 
                     onZoneSelect={setSelectedZoneId}
                     onStatsUpdate={setCurrentStats}
                     searchLocation={searchLocation}
                     timeFrame={timeFrame}
+                    activeLayers={activeLayers}
                 />
             </div>
             <div className="flex-shrink-0 bg-background-light border-t border-gray-200 p-4 z-10">

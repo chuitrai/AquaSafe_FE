@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect }) => {
+export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeLayers, onToggleLayer }) => {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -25,7 +25,12 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect }) => {
                 {['Khu dân cư', 'Đội cứu hộ', 'Điểm cứu trợ'].map((label) => (
                     <label key={label} className="flex items-center gap-2 cursor-pointer group select-none">
                       <div className="relative flex items-center">
-                        <input className="peer h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer" type="checkbox" defaultChecked/>
+                        <input 
+                            className="peer h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer" 
+                            type="checkbox" 
+                            checked={activeLayers ? activeLayers.includes(label) : true}
+                            onChange={() => onToggleLayer && onToggleLayer(label)}
+                        />
                       </div>
                       <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">{label}</span>
                     </label>

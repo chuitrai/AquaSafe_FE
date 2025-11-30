@@ -1,7 +1,20 @@
 import React, { useMemo } from 'react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
-export const StatCard = ({ data }) => {
+interface StatData {
+  title: string;
+  value: string;
+  unit?: string;
+  change: number;
+  trend: string;
+  icon: string;
+}
+
+interface StatCardProps {
+  data: StatData;
+}
+
+export const StatCard: React.FC<StatCardProps> = ({ data }) => {
   // Generate mock data based on title to make charts look different
   const chartData = useMemo(() => {
     const points = 15;
