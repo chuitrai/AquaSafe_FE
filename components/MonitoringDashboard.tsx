@@ -11,7 +11,7 @@ const initialZones = [
   { id: 5, x: 80, y: 25, severity: 'medium', location: 'Đường số 10', district: 'TP. Thủ Đức', level: 0.4, updated: '1h trước', status: 'falling' },
 ];
 
-export const MonitoringDashboard = () => {
+export const MonitoringDashboard = ({ searchLocation, timeFrame }) => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [currentStats, setCurrentStats] = useState(null);
 
@@ -31,6 +31,8 @@ export const MonitoringDashboard = () => {
                     selectedZoneId={selectedZoneId} 
                     onZoneSelect={setSelectedZoneId}
                     onStatsUpdate={setCurrentStats}
+                    searchLocation={searchLocation}
+                    timeFrame={timeFrame}
                 />
             </div>
             <div className="flex-shrink-0 bg-background-light border-t border-gray-200 p-4 z-10">
