@@ -4,11 +4,29 @@ import L from 'leaflet';
 // API Configuration
 const API_BASE_URL = "http://localhost:8220/api";
 
-export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame }) => {
+// Helper to calculate lat/lng from x/y (0-100 relative to center)
+const getZoneLatLng = (x, y) => {
+  const centerLat = 10.762622;
+  const centerLng = 106.660172;
+  const lat = centerLat - ((y - 50) / 100) * 0.15;
+  const lng = centerLng + ((x - 50) / 100) * 0.2;
+  return [lat, lng];
+};
+
+// Mock Rescue Teams
+const MOCK_RESCUE_TEAMS = [
+    { id: 'R1', x: 52, y: 48, name: "Đội CH #01", status: "busy" },
+    { id: 'R2', x: 60, y: 38, name: "Đội CH #02", status: "idle" },
+    { id: 'R3', x: 45, y: 55, name: "Đội Y Tế #05", status: "busy" },
+    { id: 'R4', x: 65, y: 60, name: "Đội Hậu Cần", status: "idle" }
+];
+
+export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame, activeLayers }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const overlayRef = useRef(null);
   const markersRef = useRef({});
+  const rescueMarkersRef = useRef([]); // Store rescue team markers
   const selectionRectRef = useRef(null); // Ref for the rectangle layer
   const borderLayersRef = useRef([]); // Ref to store drawn API border layers
   const abortControllerRef = useRef(null); // Ref to manage API cancellation
@@ -56,8 +74,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     // 4. Wait for map to be fully ready before loading heatmap
     map.whenReady(() => {
-        // Initial load happens here. 
-        // Subsequent updates are handled by the useEffect watching [timeFrame]
         if (!heatmapData) {
             loadFloodHeatmap(map);
         }
@@ -73,12 +89,79 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
   }, []);
 
+  // Handle FlyTo Zone when selectedZoneId changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !selectedZoneId) return;
+
+    const selectedZone = zones.find(z => z.id === selectedZoneId);
+    if (selectedZone) {
+        const [lat, lng] = getZoneLatLng(selectedZone.x, selectedZone.y);
+        
+        // Fly to location
+        map.flyTo([lat, lng], 15, {
+            animate: true,
+            duration: 1.2
+        });
+
+        // Open Popup for the specific marker
+        const marker = markersRef.current[selectedZoneId];
+        if (marker) {
+            marker.openPopup();
+        }
+    }
+  }, [selectedZoneId, zones]);
+
+  // Handle Rescue Team Layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Clear existing rescue markers
+    rescueMarkersRef.current.forEach(m => m.remove());
+    rescueMarkersRef.current = [];
+
+    if (activeLayers && activeLayers.includes('Đội cứu hộ')) {
+        MOCK_RESCUE_TEAMS.forEach(team => {
+            const [lat, lng] = getZoneLatLng(team.x, team.y);
+            
+            const colorClass = team.status === 'busy' ? 'bg-red-500' : 'bg-green-500';
+            const iconHtml = `
+                <div class="relative flex items-center justify-center">
+                    <div class="w-6 h-6 rounded-md shadow-md border-2 border-white ${colorClass} flex items-center justify-center">
+                        <span class="material-symbols-outlined !text-[16px] text-white">ambulance</span>
+                    </div>
+                </div>
+            `;
+
+            const icon = L.divIcon({
+                html: iconHtml,
+                className: 'custom-div-icon',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            const marker = L.marker([lat, lng], { icon }).addTo(map);
+            
+            const popupContent = `
+                <div class="font-sans min-w-[120px]">
+                    <h4 class="font-bold text-sm text-gray-800">${team.name}</h4>
+                    <p class="text-xs ${team.status === 'busy' ? 'text-red-500 font-bold' : 'text-green-600'}">
+                        ${team.status === 'busy' ? 'Đang làm nhiệm vụ' : 'Sẵn sàng'}
+                    </p>
+                </div>
+            `;
+            marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
+            
+            rescueMarkersRef.current.push(marker);
+        });
+    }
+
+  }, [activeLayers]);
+
   // Handle Timeframe Change
   useEffect(() => {
     if (mapInstanceRef.current && timeFrame) {
-        console.log("Timeframe changed to:", timeFrame.id);
-        // Reload heatmap when time changes to simulate timeline view
-        // Pass the timeframe ID to force fresh logic or query params if real API
         loadFloodHeatmap(mapInstanceRef.current);
     }
   }, [timeFrame]);
@@ -88,18 +171,15 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     const map = mapInstanceRef.current;
     if (!map || !searchLocation) return;
 
-    // Fly to new location
     map.flyTo([searchLocation.lat, searchLocation.lon], 16, {
       animate: true,
       duration: 1.5
     });
 
-    // Remove old search marker
     if (searchMarkerRef.current) {
       searchMarkerRef.current.remove();
     }
 
-    // Add new marker
     const searchIcon = L.divIcon({
       html: `
         <div class="relative flex items-center justify-center -translate-y-1/2">
@@ -129,7 +209,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     setHeatmapError(null);
 
     try {
-      // Append timestamp or timeframe to URL to prevent caching and simulate different data for mocktest
       const timeParam = timeFrame ? `&time=${timeFrame.id}` : '';
       const response = await fetch(`${API_BASE_URL}/flood-depth/map?t=${Date.now()}${timeParam}`);
       const result = await response.json();
@@ -140,24 +219,19 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
       setHeatmapData(result.data);
       
-      // Create image overlay with bounds from API
       const bounds = L.latLngBounds(
         [result.data.bounds.south, result.data.bounds.west],
         [result.data.bounds.north, result.data.bounds.east]
       );
 
-      // Remove existing heatmap overlay
       if (heatmapOverlayRef.current) {
         heatmapOverlayRef.current.remove();
       }
 
-      // Create new overlay using image URL from server
-      // Ensure we clean up the URL to avoid double slash if needed, or handle relative paths
       const imagePath = result.data.image_url.startsWith('http') 
         ? result.data.image_url 
         : `${API_BASE_URL.replace('/api', '')}${result.data.image_url}`;
 
-      // Add timestamp param to image URL to force refresh image
       const uniqueImagePath = `${imagePath}?t=${Date.now()}`;
 
       heatmapOverlayRef.current = L.imageOverlay(uniqueImagePath, bounds, {
@@ -172,7 +246,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     } catch (err) {
       console.error('Error loading flood heatmap:', err);
-      // Retry logic for connection issues
       if (retryCount < 2) {
           setTimeout(() => loadFloodHeatmap(map, retryCount + 1), 2000);
       } else {
@@ -210,7 +283,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     return null;
   };
 
-  // Function to fetch and draw borders (Returns stats, does NOT call onStatsUpdate directly)
+  // Function to fetch and draw borders
   const fetchAndDrawBorders = async (bounds) => {
     const map = mapInstanceRef.current;
     if (!map) return null;
@@ -224,7 +297,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     const signal = controller.signal;
     
     try {
-        // Clear previous border layers
         borderLayersRef.current.forEach(layer => layer.remove());
         borderLayersRef.current = [];
 
@@ -235,7 +307,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             west: bounds.getWest()
         };
 
-        // 1. Call API to get IDs
         const res = await fetch(`${API_BASE_URL}/admin/selected-area`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -245,14 +316,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         const json = await res.json();
 
         if (json.success && json.data.wards) {
-            // 2. Loop through IDs and fetch details for each
             const fetchPromises = json.data.wards.map(async (ward) => {
                 try {
                     const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { signal });
                     const detailJson = await detailRes.json();
                     
                     if (detailJson.success && detailJson.data) {
-                        // Draw Polygon
                         if (detailJson.data.members) {
                             detailJson.data.members.forEach((m) => {
                                 if (m.geometry && m.geometry.length > 1) {
@@ -267,7 +336,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             });
                         }
                         
-                        // Extract Population
                         let pop = 0;
                         if (detailJson.data.tags && detailJson.data.tags.population) {
                             const rawPop = detailJson.data.tags.population.toString().replace(/,/g, '');
@@ -376,20 +444,17 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         setIsLoadingBorders(true);
 
         try {
-            // Run both analytics in parallel for best performance
             const [wardStats, floodAnalysis] = await Promise.all([
                 fetchAndDrawBorders(bounds),
                 calculateRegionFloodDepth(bounds)
             ]);
 
-            // Combine Data
             setSelectionCoords({
                 nw: { lat: northWest.lat.toFixed(5), lng: northWest.lng.toFixed(5) },
                 se: { lat: southEast.lat.toFixed(5), lng: southEast.lng.toFixed(5) },
                 floodAnalysis: floodAnalysis
             });
 
-            // Update Main Stats
             if (onStatsUpdate) {
                 const population = wardStats?.totalPopulation || 0;
                 const avgDepth = floodAnalysis?.average_depth || 0;
@@ -397,8 +462,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 onStatsUpdate({
                     population: population,
                     avgFloodLevel: avgDepth.toFixed(2),
-                    food: (population * 0.05 / 1000).toFixed(1), // Estimate
-                    workers: Math.floor(population / 500) + 20 // Estimate
+                    food: (population * 0.05 / 1000).toFixed(1),
+                    workers: Math.floor(population / 500) + 20
                 });
             }
 
@@ -431,10 +496,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     markersRef.current = {};
 
     zones.forEach(zone => {
-      const centerLat = 10.762622;
-      const centerLng = 106.660172;
-      const lat = centerLat - ((zone.y - 50) / 100) * 0.15;
-      const lng = centerLng + ((zone.x - 50) / 100) * 0.2;
+      const [lat, lng] = getZoneLatLng(zone.x, zone.y);
 
       let colorClass = 'bg-blue-500';
       let ringClass = 'ring-blue-500';
@@ -469,7 +531,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         onZoneSelect(zone.id);
       });
 
-      // Simple popup
       const popupContent = `<div class="font-bold text-sm">${zone.location}</div>`;
       marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
       if (isSelected) marker.openPopup();
