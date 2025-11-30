@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MonitoringSidebar } from './MonitoringSidebar';
 import { MonitoringMap } from './MonitoringMap';
 import { MonitoringStats } from './MonitoringStats';
@@ -15,8 +15,18 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [currentStats, setCurrentStats] = useState(null);
   
-  // State for map layers (default checked) - Removed 'Khu dân cư'
-  const [activeLayers, setActiveLayers] = useState(['Đội cứu hộ', 'Điểm cứu trợ']);
+  // State for map layers
+  // Default: Hide operational layers for guests, Show them for logged-in users
+  const [activeLayers, setActiveLayers] = useState([]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+        setActiveLayers(['Đội cứu hộ', 'Điểm cứu trợ']);
+    } else {
+        setActiveLayers([]);
+        setSelectedZoneId(null); // Clear selection when logged out
+    }
+  }, [isLoggedIn]);
 
   const toggleLayer = (layerName) => {
     setActiveLayers(prev => 
@@ -34,13 +44,14 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
         onZoneSelect={setSelectedZoneId}
         activeLayers={activeLayers}
         onToggleLayer={toggleLayer}
+        isLoggedIn={isLoggedIn}
       />
       
       <main className="relative flex flex-1 flex-col bg-gray-100 peer-focus-within:opacity-50 transition-opacity duration-300">
         <div className="relative flex-1 w-full h-full flex flex-col">
             <div className="flex-1 relative min-h-0">
                 <MonitoringMap 
-                    zones={initialZones} 
+                    zones={isLoggedIn ? initialZones : []} 
                     selectedZoneId={selectedZoneId} 
                     onZoneSelect={setSelectedZoneId}
                     onStatsUpdate={setCurrentStats}

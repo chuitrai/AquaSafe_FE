@@ -32,16 +32,20 @@ const MOCK_RELIEF_POINTS = [
 export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame, activeLayers }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const overlayRef = useRef(null);
   const markersRef = useRef({});
   const rescueMarkersRef = useRef([]); // Store rescue team markers
   const reliefMarkersRef = useRef([]); // Store relief point markers
+  
+  // Selection Area Refs
   const selectionRectRef = useRef(null); // Ref for the rectangle layer
-  const borderLayersRef = useRef([]); // Ref to store drawn API border layers
+  const borderLayersRef = useRef([]); // Ref to store drawn API border layers (Rectangle mode)
+  
+  // Point Selection Refs
+  const pointSelectionLayerRef = useRef(L.layerGroup()); // Ref to store point marker and polygon
+  
   const abortControllerRef = useRef(null); // Ref to manage API cancellation
   const searchMarkerRef = useRef(null); // Ref specifically for the search result pin
 
-  const [isInteracting, setIsInteracting] = useState(false);
   const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
   // Heatmap State
@@ -52,11 +56,15 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   const [heatmapOpacity, setHeatmapOpacity] = useState(0.7);
   const heatmapOverlayRef = useRef(null);
   
-  // Selection Tool State
+  // Rectangle Selection Tool State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectionCoords, setSelectionCoords] = useState(null);
   const isDrawingRef = useRef(false);
   const startLatLngRef = useRef(null);
+
+  // Point Selection Tool State
+  const [isPointSelectionMode, setIsPointSelectionMode] = useState(false);
+  const [pointSelectionData, setPointSelectionData] = useState(null);
 
   // Initialize Map
   useEffect(() => {
@@ -81,7 +89,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       prefix: 'OSM'
     }).addTo(map);
 
-    // 4. Wait for map to be fully ready before loading heatmap
+    // 4. Add Layer Group for Point Selection
+    pointSelectionLayerRef.current.addTo(map);
+
+    // 5. Wait for map to be fully ready before loading heatmap
     map.whenReady(() => {
         if (!heatmapData) {
             loadFloodHeatmap(map);
@@ -422,6 +433,66 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     return null;
   };
 
+  // Function to fetch district by point
+  const fetchDistrictByPoint = async (lat, lng) => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+
+      setIsLoadingBorders(true); // Reusing loading state
+      pointSelectionLayerRef.current.clearLayers(); // Clear previous selection
+
+      try {
+          const payload = { lat, lng };
+          
+          const response = await fetch(`${API_BASE_URL}/admin/point-district`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+
+          if (result.success && result.data) {
+              const { district, geometry, properties, point } = result.data;
+
+              // 1. Draw Polygon
+              if (geometry && geometry.length > 0) {
+                  const latlngs = geometry.map(p => [p.lat, p.lon]);
+                  L.polygon(latlngs, {
+                      color: "#9333ea", // Purple
+                      weight: 3,
+                      fillColor: "#9333ea",
+                      fillOpacity: 0.15,
+                      dashArray: "5, 5"
+                  }).addTo(pointSelectionLayerRef.current);
+              }
+
+              // 2. Draw Point Marker
+              const icon = L.divIcon({
+                  html: `
+                    <div class="relative flex items-center justify-center -translate-y-1">
+                        <span class="material-symbols-outlined text-purple-600 !text-[32px] drop-shadow-md">location_on</span>
+                    </div>
+                  `,
+                  className: 'custom-div-icon',
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 30]
+              });
+              L.marker([point.lat, point.lng], { icon }).addTo(pointSelectionLayerRef.current);
+
+              // 3. Update State
+              setPointSelectionData(result.data);
+          } else {
+             console.error("Failed to get district info:", result.error);
+             setPointSelectionData(null);
+          }
+      } catch (error) {
+          console.error("Error fetching district by point:", error);
+      } finally {
+          setIsLoadingBorders(false);
+          setIsPointSelectionMode(false); // Disable mode after selection
+      }
+  };
+
   // Effect to toggle heatmap visibility
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -445,15 +516,16 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     }
   }, [heatmapOpacity]);
 
-  // Handle Selection Mode Logic
+  // Handle Rectangle Selection Mode Interactions
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
+    // Only active if rectangle mode is on
     if (isSelectionMode) {
       map.dragging.disable();
       map.getContainer().style.cursor = 'crosshair';
-    } else {
+    } else if (!isPointSelectionMode) { // Only reset if point mode is also off
       map.dragging.enable();
       map.getContainer().style.cursor = '';
       isDrawingRef.current = false;
@@ -545,6 +617,30 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
   }, [isSelectionMode]);
 
+  // Handle Point Selection Mode Interactions
+  useEffect(() => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+
+      if (isPointSelectionMode) {
+          map.getContainer().style.cursor = 'help'; // Use help or crosshair
+      } else if (!isSelectionMode) {
+          map.getContainer().style.cursor = '';
+      }
+
+      const onClick = (e) => {
+          if (!isPointSelectionMode) return;
+          fetchDistrictByPoint(e.latlng.lat, e.latlng.lng);
+      };
+
+      map.on('click', onClick);
+
+      return () => {
+          map.off('click', onClick);
+      };
+  }, [isPointSelectionMode]);
+
+
   // Handle Markers (Zones)
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -584,7 +680,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
       
       marker.on('click', (e) => {
-        if (isSelectionMode) return;
+        if (isSelectionMode || isPointSelectionMode) return; // Disable zone selection during tool usage
         L.DomEvent.stopPropagation(e);
         onZoneSelect(zone.id);
       });
@@ -595,7 +691,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
       markersRef.current[zone.id] = marker;
     });
-  }, [zones, selectedZoneId, onZoneSelect, isSelectionMode]);
+  }, [zones, selectedZoneId, onZoneSelect, isSelectionMode, isPointSelectionMode]);
 
   const handleZoom = (type) => {
     if (mapInstanceRef.current) {
@@ -633,16 +729,16 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         {isLoadingBorders && (
             <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-primary/90 text-white backdrop-blur px-4 py-2 rounded-full shadow-xl text-xs font-bold flex items-center gap-2 z-[1000] pointer-events-none animate-bounce">
                 <span className="material-symbols-outlined !text-[16px] animate-spin">analytics</span>
-                Đang phân tích dữ liệu vùng...
+                Đang phân tích dữ liệu...
             </div>
         )}
 
-        {/* Selection Details Panel */}
+        {/* RECTANGLE Selection Details Panel */}
         {selectionCoords && (
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-white/50 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full">
              <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
                 <span className="material-symbols-outlined text-primary">area_chart</span>
-                <span className="font-bold text-gray-800 text-sm">Kết Quả Phân Tích</span>
+                <span className="font-bold text-gray-800 text-sm">Kết Quả Phân Tích Vùng</span>
                 <button 
                   onClick={() => {
                     setSelectionCoords(null);
@@ -693,7 +789,65 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           </div>
         )}
 
-        {/* Heatmap Controls & Legend */}
+        {/* POINT Selection Details Panel */}
+        {pointSelectionData && (
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-purple-200 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full ring-1 ring-purple-100">
+             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                <span className="material-symbols-outlined text-purple-600">location_on</span>
+                <span className="font-bold text-gray-800 text-sm">Thông Tin Điểm Chọn</span>
+                <button 
+                  onClick={() => {
+                    setPointSelectionData(null);
+                    pointSelectionLayerRef.current.clearLayers();
+                  }}
+                  className="ml-auto hover:bg-gray-100 rounded-full p-1 transition-colors"
+                >
+                  <span className="material-symbols-outlined !text-[18px] text-gray-400">close</span>
+                </button>
+             </div>
+
+             <div className="space-y-3">
+                 <div className="flex justify-between items-start">
+                     <div>
+                         <h3 className="text-lg font-bold text-gray-800 leading-tight">{pointSelectionData.district.name}</h3>
+                         <p className="text-xs text-gray-500">{pointSelectionData.district.type} - Level {pointSelectionData.district.admin_level}</p>
+                     </div>
+                     <div className="text-right">
+                         <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                             ID: {pointSelectionData.district.id}
+                         </span>
+                     </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3">
+                   <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex flex-col justify-center">
+                     <div className="flex items-center gap-1.5 mb-1">
+                        <span className="material-symbols-outlined text-gray-400 !text-[16px]">groups</span>
+                        <p className="text-[10px] text-gray-500 font-semibold uppercase">Dân Số</p>
+                     </div>
+                     <p className="font-bold text-gray-800 text-lg">
+                        {pointSelectionData.properties.population.toLocaleString()}
+                     </p>
+                   </div>
+                   <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex flex-col justify-center">
+                     <div className="flex items-center gap-1.5 mb-1">
+                        <span className="material-symbols-outlined text-blue-400 !text-[16px]">water</span>
+                        <p className="text-[10px] text-blue-500 font-semibold uppercase">Độ Ngập Hiện Tại</p>
+                     </div>
+                     <p className="font-bold text-blue-700 text-lg">
+                        {pointSelectionData.properties.flood_depth}m
+                     </p>
+                   </div>
+                 </div>
+                 
+                 <div className="flex items-center gap-2 text-[10px] text-gray-400 justify-end pt-1">
+                     <span>Diện tích: {pointSelectionData.properties.area_km2} km²</span>
+                 </div>
+             </div>
+          </div>
+        )}
+
+        {/* Heatmap Controls & Legend (Same as before) */}
         {showHeatmap && heatmapData && !isLoadingHeatmap && (
             <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/50 w-64">
                 <div className="flex justify-between items-start mb-3">
@@ -765,17 +919,46 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </button>
             </div>
 
+            {/* Rectangle Selection Tool */}
             <button 
-                onClick={() => setIsSelectionMode(!isSelectionMode)}
+                onClick={() => {
+                    setIsSelectionMode(!isSelectionMode);
+                    setIsPointSelectionMode(false);
+                    setPointSelectionData(null);
+                    pointSelectionLayerRef.current.clearLayers();
+                }}
                 className={`h-10 w-10 flex items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
                     isSelectionMode 
                     ? 'bg-primary text-white ring-primary' 
                     : 'bg-white/90 hover:bg-gray-50 text-gray-700'
                 }`}
-                title="Chọn vùng phân tích"
+                title="Chọn vùng (Hình chữ nhật)"
             >
                 <span className="material-symbols-outlined !text-[20px]">
                   {isSelectionMode ? 'check_box' : 'crop_free'}
+                </span>
+            </button>
+
+            {/* Point Selection Tool */}
+            <button 
+                onClick={() => {
+                    setIsPointSelectionMode(!isPointSelectionMode);
+                    setIsSelectionMode(false);
+                    setSelectionCoords(null);
+                    if (selectionRectRef.current) {
+                        selectionRectRef.current.remove();
+                        selectionRectRef.current = null;
+                    }
+                }}
+                className={`h-10 w-10 flex items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
+                    isPointSelectionMode 
+                    ? 'bg-purple-600 text-white ring-purple-600' 
+                    : 'bg-white/90 hover:bg-gray-50 text-gray-700'
+                }`}
+                title="Chọn điểm (Quận/Phường)"
+            >
+                <span className="material-symbols-outlined !text-[20px]">
+                  {isPointSelectionMode ? 'location_on' : 'pin_drop'}
                 </span>
             </button>
             
