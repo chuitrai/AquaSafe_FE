@@ -739,61 +739,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             </div>
         )}
 
-        {/* RECTANGLE Selection Details Panel */}
-        {selectionCoords && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-white/50 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full">
-             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
-                <span className="material-symbols-outlined text-primary">area_chart</span>
-                <span className="font-bold text-gray-800 text-sm">Kết Quả Phân Tích Vùng</span>
-                <button 
-                  onClick={() => {
-                    setSelectionCoords(null);
-                    if(selectionRectRef.current) {
-                      selectionRectRef.current.remove();
-                      selectionRectRef.current = null;
-                    }
-                    borderLayersRef.current.forEach(layer => layer.remove());
-                    borderLayersRef.current = [];
-                    if (onStatsUpdate) onStatsUpdate(null);
-                  }}
-                  className="ml-auto hover:bg-gray-100 rounded-full p-1 transition-colors"
-                >
-                  <span className="material-symbols-outlined !text-[18px] text-gray-400">close</span>
-                </button>
-             </div>
-
-             {selectionCoords.floodAnalysis ? (
-               <div className="space-y-3">
-                 <div className="grid grid-cols-3 gap-3">
-                   <div className="bg-blue-50 p-2.5 rounded-lg text-center border border-blue-100">
-                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Trung Bình</p>
-                     <p className="font-bold text-blue-700 text-lg">{selectionCoords.floodAnalysis.average_depth?.toFixed(2)}m</p>
-                   </div>
-                   <div className="bg-red-50 p-2.5 rounded-lg text-center border border-red-100">
-                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Cao Nhất</p>
-                     <p className="font-bold text-red-700 text-lg">{selectionCoords.floodAnalysis.max_depth?.toFixed(2)}m</p>
-                   </div>
-                   <div className="bg-green-50 p-2.5 rounded-lg text-center border border-green-100">
-                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Thấp Nhất</p>
-                     <p className="font-bold text-green-700 text-lg">{selectionCoords.floodAnalysis.min_depth?.toFixed(2)}m</p>
-                   </div>
-                 </div>
-                 
-                 <div className="bg-gray-50 rounded-lg p-2.5 text-xs border border-gray-100">
-                    <div className="flex justify-between mb-1">
-                        <span className="text-gray-600">Độ phủ ngập:</span>
-                        <span className="font-bold text-gray-800">{selectionCoords.floodAnalysis.coverage_percentage?.toFixed(1)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${selectionCoords.floodAnalysis.coverage_percentage}%` }}></div>
-                    </div>
-                 </div>
-               </div>
-             ) : (
-                <div className="text-center py-2 text-gray-500 text-xs italic">Không có dữ liệu ngập cho vùng này</div>
-             )}
-          </div>
-        )}
 
         {/* POINT Selection Details Panel */}
         {pointSelectionData && (
@@ -994,28 +939,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             >
                 <span className="material-symbols-outlined !text-[20px]">
                   {isSelectionMode ? 'check_box' : 'crop_free'}
-                </span>
-            </button>
-
-            <button 
-                onClick={() => {
-                    setIsPointSelectionMode(!isPointSelectionMode);
-                    setIsSelectionMode(false);
-                    setSelectionCoords(null);
-                    if (selectionRectRef.current) {
-                        selectionRectRef.current.remove();
-                        selectionRectRef.current = null;
-                    }
-                }}
-                className={`h-10 w-10 flex items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
-                    isPointSelectionMode 
-                    ? 'bg-purple-600 text-white ring-purple-600' 
-                    : 'bg-white/90 hover:bg-gray-50 text-gray-700'
-                }`}
-                title="Chọn điểm (Quận/Phường)"
-            >
-                <span className="material-symbols-outlined !text-[20px]">
-                  {isPointSelectionMode ? 'location_on' : 'pin_drop'}
                 </span>
             </button>
             
