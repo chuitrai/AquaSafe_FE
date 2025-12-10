@@ -14,22 +14,17 @@ const getZoneLatLng = (x, y) => {
 };
 
 // --- CONVEX HULL ALGORITHM (Monotone Chain) ---
-// Sorts points to draw a clean polygon without crossing lines
 const getConvexHull = (points) => {
     if (points.length < 3) return points;
 
-    // 1. Sort points by longitude (x), then latitude (y)
     const sortedPoints = [...points].sort((a, b) => {
         return a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon;
     });
 
-    // Cross product of vectors OA and OB
-    // A positive cross product indicates a "left" turn, zero a straight line, and negative a "right" turn.
     const crossProduct = (o, a, b) => {
         return (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
     };
 
-    // 2. Build lower hull
     const lower = [];
     for (const point of sortedPoints) {
         while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
@@ -38,7 +33,6 @@ const getConvexHull = (points) => {
         lower.push(point);
     }
 
-    // 3. Build upper hull
     const upper = [];
     for (let i = sortedPoints.length - 1; i >= 0; i--) {
         const point = sortedPoints[i];
@@ -48,7 +42,6 @@ const getConvexHull = (points) => {
         upper.push(point);
     }
 
-    // 4. Concatenate (remove duplicate start/end points)
     lower.pop();
     upper.pop();
     return lower.concat(upper);
@@ -62,7 +55,7 @@ const MOCK_RESCUE_TEAMS = [
     { id: 'R4', x: 65, y: 60, name: "Đội Hậu Cần", status: "idle" }
 ];
 
-// Mock Relief Points (Shelters, Food Distribution)
+// Mock Relief Points
 const MOCK_RELIEF_POINTS = [
     { id: 'P1', x: 50, y: 35, name: "UBND Phường 22", type: "shelter", capacity: "150/200" },
     { id: 'P2', x: 75, y: 45, name: "Trường THPT Thảo Điền", type: "shelter", capacity: "50/500" },
@@ -70,7 +63,7 @@ const MOCK_RELIEF_POINTS = [
     { id: 'P4', x: 58, y: 25, name: "Trạm Y Tế Phường 15", type: "medical", capacity: "Sẵn sàng" }
 ];
 
-export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame, activeLayers }) => {
+export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame, activeLayers, isLoggedIn }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
@@ -89,6 +82,11 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
   const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
+  // Real-time Flood Status Map (ID -> Depth)
+  // Used Ref for immediate access in async functions, State for triggering re-renders/effects if needed
+  const floodStatusRef = useRef({});
+  const [lastUpdated, setLastUpdated] = useState(Date.now());
+
   // Heatmap State
   const [isLoadingHeatmap, setIsLoadingHeatmap] = useState(false);
   const [heatmapData, setHeatmapData] = useState(null);
@@ -143,6 +141,61 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       }
     };
   }, []);
+
+  // Polling Flood Depth Status (Every 1 minute)
+  useEffect(() => {
+    const fetchFloodStatus = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/flood-depth-status`);
+            const json = await res.json();
+            
+            if (json.success && Array.isArray(json.data)) {
+                const statusMap = {};
+                let totalDepth = 0;
+                let validCount = 0;
+
+                json.data.forEach(item => {
+                    statusMap[item.id] = item.depth;
+                    // Count for global average (assuming 0 is valid "no flood" but for average level of flooded areas we might want > 0, 
+                    // but for general monitoring index, we include all).
+                    // Converting mm to meters for calculation
+                    totalDepth += (item.depth || 0);
+                    validCount++;
+                });
+
+                floodStatusRef.current = statusMap;
+                setLastUpdated(Date.now());
+
+                // Calculate Global Stats if no area is currently selected
+                if (!selectedZoneId && !selectionCoords && onStatsUpdate) {
+                    const globalAvgDepthMm = validCount > 0 ? totalDepth / validCount : 0;
+                    const globalAvgDepthM = globalAvgDepthMm / 1000; // Convert mm to meters
+
+                    // Heuristic population estimate based on monitored nodes (approx 12000 per node/ward)
+                    // This is just to satisfy "Calculate instead of N/A" for initial view
+                    const estimatedPop = validCount * 12500; 
+
+                    onStatsUpdate({
+                        population: estimatedPop,
+                        avgFloodLevel: globalAvgDepthM.toFixed(2),
+                        food: (estimatedPop * 0.05 / 1000).toFixed(1),
+                        workers: Math.floor(estimatedPop / 2000) + 10
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error polling flood status:", err);
+        }
+    };
+
+    // Initial fetch
+    fetchFloodStatus();
+
+    // Poll every 60 seconds
+    const intervalId = setInterval(fetchFloodStatus, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [selectedZoneId, selectionCoords]); // Re-run logic if selection clears to restore global stats
 
   // Handle FlyTo Zone
   useEffect(() => {
@@ -394,7 +447,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                         if (detailJson.data.members) {
                             detailJson.data.members.forEach((m) => {
                                 if (m.geometry && m.geometry.length > 1) {
-                                    // Use simple polyline for border segments (ways)
                                     const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
                                     const polyline = L.polyline(latlngs, {
                                         color: "#ef4444",
@@ -406,7 +458,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             });
                         }
                         
-                        // Population
+                        // Population from Tag
                         let pop = 0;
                         if (detailJson.data.tags && detailJson.data.tags.population) {
                             const rawPop = detailJson.data.tags.population.toString().replace(/,/g, '');
@@ -414,26 +466,33 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             if (isNaN(pop)) pop = 0;
                         }
 
-                        // Flood Depth
-                        let depth = 0;
-                        if (detailJson.data.tags && detailJson.data.tags.flood_depth) {
-                            depth = parseFloat(detailJson.data.tags.flood_depth);
-                            if (isNaN(depth)) depth = 0;
+                        // Flood Depth from Polled Data (Real-time)
+                        // Use the local ref to get the latest polling result
+                        let depthMm = 0;
+                        if (floodStatusRef.current && floodStatusRef.current[ward.id] !== undefined) {
+                            depthMm = floodStatusRef.current[ward.id];
+                        } else if (detailJson.data.tags && detailJson.data.tags.flood_depth) {
+                            // Fallback to static tag if real-time data missing (unlikely if polling works)
+                            depthMm = parseFloat(detailJson.data.tags.flood_depth);
                         }
+                        if (isNaN(depthMm)) depthMm = 0;
 
-                        return { pop, depth };
+                        return { pop, depthMm };
                     }
                 } catch (err) { }
-                return { pop: 0, depth: 0 };
+                return { pop: 0, depthMm: 0 };
             });
 
             const results = await Promise.all(fetchPromises);
             
             const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
-            const totalDepth = results.reduce((sum, curr) => sum + curr.depth, 0);
-            const avgFloodDepth = results.length > 0 ? totalDepth / results.length : 0;
+            const totalDepthMm = results.reduce((sum, curr) => sum + curr.depthMm, 0);
+            const avgFloodDepthMm = results.length > 0 ? totalDepthMm / results.length : 0;
+            
+            // Convert MM to Meters for display
+            const avgFloodDepthM = avgFloodDepthMm / 1000;
 
-            return { totalPopulation, avgFloodDepth };
+            return { totalPopulation, avgFloodDepth: avgFloodDepthM };
         }
     } catch (error) {
         if (error.name !== 'AbortError') console.error("Error fetching borders:", error);
@@ -464,27 +523,24 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
               // 1. Draw Polygon - Clean Style with Convex Hull
               if (geometry && geometry.length > 2) {
-                  // Apply Convex Hull Algorithm here
                   const hullPoints = getConvexHull(geometry);
                   const latlngs = hullPoints.map(p => [p.lat, p.lon]);
                   
                   L.polygon(latlngs, {
-                      color: "#9333ea", // Purple-600
-                      weight: 4,        // Thicker outline
+                      color: "#9333ea",
+                      weight: 4,
                       opacity: 1,
                       fillColor: "#9333ea", 
-                      fillOpacity: 0.15, // Very light fill
+                      fillOpacity: 0.15,
                       lineCap: 'round',
                       lineJoin: 'round',
                       smoothFactor: 1.0
                   }).addTo(pointSelectionLayerRef.current);
                   
-                  // Zoom to polygon
                   const bounds = L.latLngBounds(latlngs);
                   map.flyToBounds(bounds, { padding: [80, 80], duration: 1.2 });
               }
 
-              // 2. Draw Point Marker
               const icon = L.divIcon({
                   html: `
                     <div class="relative flex items-center justify-center -translate-y-1">
@@ -598,7 +654,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
             if (onStatsUpdate) {
                 const population = wardStats?.totalPopulation || 0;
-                // Use depth from ward tags if available (wardStats.avgFloodDepth), 
+                // Use depth from ward polled data (wardStats.avgFloodDepth), 
                 // fallback to region analysis or 0.
                 const avgDepth = wardStats?.avgFloodDepth || floodAnalysis?.average_depth || 0;
 
@@ -739,6 +795,81 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             </div>
         )}
 
+        {/* RECTANGLE Selection Details Panel */}
+        {selectionCoords && (
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-white/50 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full">
+             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                <span className="material-symbols-outlined text-primary">area_chart</span>
+                <span className="font-bold text-gray-800 text-sm">Kết Quả Phân Tích Vùng</span>
+                <button 
+                  onClick={() => {
+                    setSelectionCoords(null);
+                    if(selectionRectRef.current) {
+                      selectionRectRef.current.remove();
+                      selectionRectRef.current = null;
+                    }
+                    borderLayersRef.current.forEach(layer => layer.remove());
+                    borderLayersRef.current = [];
+                    if (onStatsUpdate) {
+                         // Recalculate global stats if selection is cleared
+                         const statusMap = floodStatusRef.current;
+                         if (Object.keys(statusMap).length > 0) {
+                             let totalDepth = 0;
+                             let count = 0;
+                             Object.values(statusMap).forEach(d => {
+                                 totalDepth += (d as number);
+                                 count++;
+                             });
+                             const estPop = count * 12500;
+                             onStatsUpdate({
+                                population: estPop,
+                                avgFloodLevel: (count > 0 ? (totalDepth/count)/1000 : 0).toFixed(2),
+                                food: (estPop * 0.05 / 1000).toFixed(1),
+                                workers: Math.floor(estPop / 2000) + 10
+                             });
+                         } else {
+                             onStatsUpdate(null);
+                         }
+                    }
+                  }}
+                  className="ml-auto hover:bg-gray-100 rounded-full p-1 transition-colors"
+                >
+                  <span className="material-symbols-outlined !text-[18px] text-gray-400">close</span>
+                </button>
+             </div>
+
+             {selectionCoords.floodAnalysis ? (
+               <div className="space-y-3">
+                 <div className="grid grid-cols-3 gap-3">
+                   <div className="bg-blue-50 p-2.5 rounded-lg text-center border border-blue-100">
+                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Trung Bình</p>
+                     <p className="font-bold text-blue-700 text-lg">{selectionCoords.floodAnalysis.average_depth?.toFixed(2)}m</p>
+                   </div>
+                   <div className="bg-red-50 p-2.5 rounded-lg text-center border border-red-100">
+                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Cao Nhất</p>
+                     <p className="font-bold text-red-700 text-lg">{selectionCoords.floodAnalysis.max_depth?.toFixed(2)}m</p>
+                   </div>
+                   <div className="bg-green-50 p-2.5 rounded-lg text-center border border-green-100">
+                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Thấp Nhất</p>
+                     <p className="font-bold text-green-700 text-lg">{selectionCoords.floodAnalysis.min_depth?.toFixed(2)}m</p>
+                   </div>
+                 </div>
+                 
+                 <div className="bg-gray-50 rounded-lg p-2.5 text-xs border border-gray-100">
+                    <div className="flex justify-between mb-1">
+                        <span className="text-gray-600">Độ phủ ngập:</span>
+                        <span className="font-bold text-gray-800">{selectionCoords.floodAnalysis.coverage_percentage?.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${selectionCoords.floodAnalysis.coverage_percentage}%` }}></div>
+                    </div>
+                 </div>
+               </div>
+             ) : (
+                <div className="text-center py-2 text-gray-500 text-xs italic">Không có dữ liệu ngập cho vùng này</div>
+             )}
+          </div>
+        )}
 
         {/* POINT Selection Details Panel */}
         {pointSelectionData && (

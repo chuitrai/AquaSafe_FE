@@ -58,6 +58,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
                     searchLocation={searchLocation}
                     timeFrame={timeFrame}
                     activeLayers={activeLayers}
+                    isLoggedIn={isLoggedIn}
                 />
             </div>
             {/* Only show Stats if User is Logged In */}
