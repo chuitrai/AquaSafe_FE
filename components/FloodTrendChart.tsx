@@ -38,7 +38,7 @@ export const FloodTrendChart = ({ viewMode }: { viewMode: 'day' | 'week' | 'mont
     <div className="w-full h-full flex flex-col">
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
-          <h3 className="text-lg font-bold text-text-primary">Dân số bị ảnh hưởng</h3>
+          <h3 className="text-lg font-bold text-text-primary">Theo dõi mực nước</h3>
           <p className="text-xs text-text-muted mt-1">Theo dõi diễn biến mực nước theo khung thời gian.</p>
         </div>
         <span className="text-xs text-text-muted">{viewMode === 'day' ? 'Tổng quan giờ trong ngày' : viewMode === 'week' ? 'Xu hướng tuần' : 'Báo cáo tháng'}</span>
