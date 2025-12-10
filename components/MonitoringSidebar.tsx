@@ -1,4 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+// Helper component to render dynamic time ago (e.g. "1 min ago")
+const TimeAgo = ({ timestamp }) => {
+    const [timeString, setTimeString] = useState('Vừa xong');
+
+    useEffect(() => {
+        const updateTime = () => {
+            const now = Date.now();
+            const diffInSeconds = Math.floor((now - timestamp) / 1000);
+
+            if (diffInSeconds < 60) {
+                setTimeString('Vừa xong');
+            } else {
+                const diffInMinutes = Math.floor(diffInSeconds / 60);
+                setTimeString(`${diffInMinutes}p trước`);
+            }
+        };
+
+        updateTime();
+        const interval = setInterval(updateTime, 60000); // Update every minute
+        return () => clearInterval(interval);
+    }, [timestamp]);
+
+    return <span>{timeString}</span>;
+};
 
 export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeLayers, onToggleLayer, isLoggedIn }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -69,7 +94,7 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
                         <div 
                             key={zone.id} 
                             onClick={() => onZoneSelect(zone.id)}
-                            className={`group relative rounded-lg border p-3.5 transition-all hover:shadow-md cursor-pointer ${
+                            className={`group relative rounded-lg border p-3.5 transition-all hover:shadow-md cursor-pointer animate-in fade-in slide-in-from-left-2 duration-300 ${
                             selectedZoneId === zone.id 
                                 ? 'border-primary bg-blue-50/40 ring-1 ring-primary shadow-sm' 
                                 : 'border-gray-200 bg-white hover:border-primary/50'
@@ -90,9 +115,9 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
                             <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 border-dashed">
                                 <div className="flex items-center gap-1 text-xs text-gray-500">
                                     <span className="material-symbols-outlined !text-[14px]">schedule</span>
-                                    <span>{zone.updated || 'Vừa cập nhật'}</span>
+                                    <TimeAgo timestamp={zone.timestamp} />
                                 </div>
-                                <div className={`flex items-center gap-1 text-xs font-semibold ${
+                                <div className={`flex items-center gap-1 text-xs font-bold ${
                                     zone.status === 'rising' ? 'text-red-500' : 
                                     zone.status === 'falling' ? 'text-green-500' : 'text-gray-500'
                                 }`}>

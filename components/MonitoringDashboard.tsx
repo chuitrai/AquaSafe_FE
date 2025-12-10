@@ -29,11 +29,30 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
   };
 
   const handleCriticalZonesUpdate = (newZones) => {
-      // Merge new zones or replace based on logic. Here we replace/update based on ID
       setCriticalZones(prev => {
           const map = new Map(prev.map(z => [z.id, z]));
-          newZones.forEach(z => map.set(z.id, z));
-          return Array.from(map.values()).sort((a, b) => parseFloat(b.level) - parseFloat(a.level));
+          
+          // Update or Add new zones
+          newZones.forEach(z => {
+              map.set(z.id, z);
+          });
+
+          // Convert back to array
+          const updatedList = Array.from(map.values());
+
+          // Sort Logic: 
+          // 1. Severity (Critical > High > Medium)
+          // 2. Level (Highest first)
+          // 3. Recently Updated
+          return updatedList.sort((a, b) => {
+              const severityScore = { 'critical': 3, 'high': 2, 'medium': 1, 'low': 0 };
+              const scoreA = severityScore[a.severity] || 0;
+              const scoreB = severityScore[b.severity] || 0;
+
+              if (scoreA !== scoreB) return scoreB - scoreA;
+              if (parseFloat(b.level) !== parseFloat(a.level)) return parseFloat(b.level) - parseFloat(a.level);
+              return b.timestamp - a.timestamp;
+          });
       });
   };
 

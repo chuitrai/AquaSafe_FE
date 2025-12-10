@@ -43,8 +43,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
   const polygonLayersRef = useRef({}); 
-  const rescueMarkersRef = useRef([]); 
-  const reliefMarkersRef = useRef([]); 
   
   // Selection Area Refs
   const selectionRectRef = useRef(null);
@@ -60,9 +58,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   
   // Real-time Flood Status
   const floodStatusRef = useRef({});
-  const currentMaxFloodIdRef = useRef(null);
-  const [lastUpdated, setLastUpdated] = useState(Date.now());
-
+  
   // Rectangle Selection Tool State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectionCoords, setSelectionCoords] = useState(null);
@@ -105,7 +101,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
   }, []);
 
-  // Polling Flood Depth Status & Auto-Fetch Critical Zones
+  // Polling Flood Depth Status & Update Zones
   useEffect(() => {
     const fetchFloodStatus = async () => {
         try {
@@ -113,27 +109,62 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             const json = await res.json();
             
             if (json.success && Array.isArray(json.data)) {
-                const statusMap = {};
+                const updates = [];
+                const newFetches = [];
                 let totalDepth = 0;
                 let validCount = 0;
-                
-                // Find max depth
-                let maxDepthItem = { id: null, depth: -1 };
 
                 json.data.forEach(item => {
-                    statusMap[item.id] = item.depth;
-                    totalDepth += (item.depth || 0);
+                    const id = item.id;
+                    const newDepthMm = item.depth || 0;
+                    const oldDepthMm = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepthMm;
+                    
+                    // Update Ref
+                    floodStatusRef.current[id] = newDepthMm;
+                    totalDepth += newDepthMm;
                     validCount++;
 
-                    if (item.depth > maxDepthItem.depth) {
-                        maxDepthItem = item;
+                    // Logic to detect changes
+                    const isRising = newDepthMm > oldDepthMm;
+                    const isFalling = newDepthMm < oldDepthMm;
+                    
+                    // Determine Severity
+                    let severity = 'low';
+                    if (newDepthMm > 1000) severity = 'critical';
+                    else if (newDepthMm > 500) severity = 'high';
+                    else if (newDepthMm > 200) severity = 'medium';
+
+                    // Check if this zone is already being tracked
+                    const existingZone = zones.find(z => z.id === id);
+
+                    if (existingZone) {
+                        // Only update if there is a change in depth or status
+                        if (isRising || isFalling || existingZone.level !== (newDepthMm / 1000).toFixed(1)) {
+                            updates.push({
+                                ...existingZone,
+                                level: (newDepthMm / 1000).toFixed(1),
+                                severity: severity,
+                                status: isRising ? 'rising' : (isFalling ? 'falling' : 'stable'),
+                                timestamp: Date.now() // Update timestamp for Sidebar
+                            });
+                        }
+                    } else if (newDepthMm > 200) {
+                        // New potential zone (only care if > 200mm to avoid spam)
+                        newFetches.push({ id, depthMm: newDepthMm });
                     }
                 });
 
-                floodStatusRef.current = statusMap;
-                setLastUpdated(Date.now());
+                // Send updates for existing zones immediately
+                if (updates.length > 0 && onCriticalZonesUpdate) {
+                    onCriticalZonesUpdate(updates);
+                }
 
-                // Update Global Stats
+                // Fetch details for NEW high-risk zones
+                newFetches.forEach(item => {
+                    fetchCriticalZoneDetails(item.id, item.depthMm);
+                });
+
+                // Update Global Stats if no specific selection
                 if (!selectedZoneId && !selectionCoords && onStatsUpdate) {
                     const globalAvgDepthMm = validCount > 0 ? totalDepth / validCount : 0;
                     const globalAvgDepthM = globalAvgDepthMm / 1000;
@@ -145,20 +176,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                         food: (estimatedPop * 0.05 / 1000).toFixed(1),
                         workers: Math.floor(estimatedPop / 2000) + 10
                     });
-                }
-
-                // Logic to update Critical Zone if Max Depth changes or new high flood detected
-                if (maxDepthItem.id && maxDepthItem.depth > 0) {
-                     // Check if we need to fetch details for this ward (if it's new or depth changed siginificantly)
-                     // For simplicity, we fetch if it's the new max ID or we haven't fetched it yet.
-                     if (currentMaxFloodIdRef.current !== maxDepthItem.id) {
-                         currentMaxFloodIdRef.current = maxDepthItem.id;
-                         fetchCriticalZoneDetails(maxDepthItem.id, maxDepthItem.depth);
-                     } else {
-                         // Update existing zone level in UI if ID is same but depth changed? 
-                         // For now, rely on re-fetch or internal state update.
-                         // Optimization: could just update the level in the criticalZones list without re-fetching geometry.
-                     }
                 }
             }
         } catch (err) {
@@ -174,13 +191,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             if (json.success && json.data) {
                 const { tags, bounds } = json.data;
                 const name = tags.name || `Khu vực #${id}`;
-                const province = "Thừa Thiên Huế"; // Context is Hue
+                const province = "Thừa Thiên Huế"; 
                 const levelM = (depthMm / 1000).toFixed(1);
                 
-                // Determine severity
-                let severity = 'medium';
-                if (depthMm > 1000) severity = 'critical'; // > 1m
-                else if (depthMm > 500) severity = 'high'; // > 0.5m
+                let severity = 'low';
+                if (depthMm > 1000) severity = 'critical';
+                else if (depthMm > 500) severity = 'high';
+                else if (depthMm > 200) severity = 'medium';
 
                 const newZone = {
                     id: id,
@@ -188,10 +205,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     district: province,
                     level: levelM,
                     severity: severity,
-                    updated: 'Vừa xong',
-                    status: 'rising', // Simplified trend
-                    bounds: bounds, // Store raw bounds for FlyTo
-                    rawData: json.data // Store for drawing
+                    timestamp: Date.now(), // Use numeric timestamp
+                    status: 'rising', // Default to rising when first detected high
+                    bounds: bounds,
+                    rawData: json.data 
                 };
                 
                 if (onCriticalZonesUpdate) {
@@ -204,9 +221,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
 
     fetchFloodStatus();
-    const intervalId = setInterval(fetchFloodStatus, 10000); // 10 seconds
+    const intervalId = setInterval(fetchFloodStatus, 10000); // Poll every 10s
     return () => clearInterval(intervalId);
-  }, [selectedZoneId, selectionCoords]); 
+  }, [zones, selectedZoneId, selectionCoords, onCriticalZonesUpdate, onStatsUpdate]); 
 
   // Handle FlyTo Zone (Bounds or Lat/Lng)
   useEffect(() => {
@@ -220,7 +237,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             const bounds = L.latLngBounds([minlat, minlon], [maxlat, maxlon]);
             map.flyToBounds(bounds, { animate: true, duration: 1.2, padding: [50, 50] });
         } else if (selectedZone.x && selectedZone.y) {
-            // Fallback for mock data if still used
              const centerLat = 16.4637;
              const centerLng = 107.5909;
              const lat = centerLat - ((selectedZone.y - 50) / 100) * 0.1;
@@ -616,6 +632,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             onZoneSelect(zone.id);
           });
           
+          // Time ago logic for popup would need to be computed or passed, using static here for map popup simplicity
           const popupContent = `
             <div class="min-w-[180px] font-sans">
                  <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
@@ -639,20 +656,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       }
     });
   }, [zones, selectedZoneId, onZoneSelect, isSelectionMode]);
-
-
-  const handleZoom = (type) => {
-    if (mapInstanceRef.current) {
-      if (type === 'in') mapInstanceRef.current.zoomIn();
-      else mapInstanceRef.current.zoomOut();
-    }
-  };
-
-  const handleLocate = () => {
-     if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([16.4637, 107.5909], 12);
-     }
-  };
 
   return (
     <div className="absolute inset-0 w-full h-full bg-gray-200">
@@ -719,10 +722,14 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         {/* Map Controls */}
         <div className="absolute right-4 top-4 flex flex-col items-end gap-2 z-[1000]">
             <div className="flex flex-col rounded-xl bg-white/90 shadow-lg backdrop-blur-sm ring-1 ring-black/5 overflow-hidden">
-                <button onClick={() => handleZoom('in')} className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 border-b border-gray-100 transition-colors">
+                <button 
+                  onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.zoomIn(); }} 
+                  className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 border-b border-gray-100 transition-colors">
                     <span className="material-symbols-outlined text-gray-700 !text-[20px]">add</span>
                 </button>
-                <button onClick={() => handleZoom('out')} className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 transition-colors">
+                <button 
+                  onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.zoomOut(); }} 
+                  className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 transition-colors">
                     <span className="material-symbols-outlined text-gray-700 !text-[20px]">remove</span>
                 </button>
             </div>
@@ -746,7 +753,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </span>
             </button>
             
-            <button onClick={handleLocate} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-50 ring-1 ring-black/5 transition-colors mt-2">
+            <button 
+               onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.setView([16.4637, 107.5909], 12); }}
+               className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-50 ring-1 ring-black/5 transition-colors mt-2">
                 <span className="material-symbols-outlined text-gray-700 !text-[20px]">my_location</span>
             </button>
         </div>
