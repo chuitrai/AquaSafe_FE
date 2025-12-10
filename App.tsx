@@ -10,6 +10,7 @@ const App = () => {
   
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [token, setToken] = useState(null);
   
   // State to hold the coordinates selected from the search bar
   const [searchLocation, setSearchLocation] = useState(null);
@@ -27,6 +28,7 @@ const App = () => {
     if (isLoggedIn) {
       // Logout logic
       setIsLoggedIn(false);
+      setToken(null);
       setCurrentView('monitoring');
     } else {
       // Go to Login Page
@@ -46,8 +48,8 @@ const App = () => {
 
           if (response.ok) {
               const data = await response.json();
-              // You might want to store the token here if needed for future requests
-              // localStorage.setItem('token', data.token);
+              // Store token
+              setToken(data.token);
               
               setIsLoggedIn(true);
               setCurrentView('analysis'); // Redirect to analysis dashboard on success
@@ -91,6 +93,7 @@ const App = () => {
                 searchLocation={searchLocation} 
                 timeFrame={timeFrame}
                 isLoggedIn={isLoggedIn}
+                token={token}
             />
         )}
       </main>

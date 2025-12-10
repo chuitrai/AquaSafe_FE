@@ -3,7 +3,7 @@ import { MonitoringSidebar } from './MonitoringSidebar';
 import { MonitoringMap } from './MonitoringMap';
 import { MonitoringStats } from './MonitoringStats';
 
-export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) => {
+export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, token }) => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [currentStats, setCurrentStats] = useState(null);
   const [criticalZones, setCriticalZones] = useState([]);
@@ -82,6 +82,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
                     timeFrame={timeFrame}
                     activeLayers={activeLayers}
                     isLoggedIn={isLoggedIn}
+                    token={token}
                 />
             </div>
             {/* Only show Stats if User is Logged In */}

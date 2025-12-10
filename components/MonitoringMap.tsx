@@ -38,7 +38,7 @@ const getConvexHull = (points) => {
     return lower.concat(upper);
 };
 
-export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, onCriticalZonesUpdate, searchLocation, timeFrame, activeLayers, isLoggedIn }) => {
+export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, onCriticalZonesUpdate, searchLocation, timeFrame, activeLayers, isLoggedIn, token }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
@@ -68,6 +68,15 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   // Point Selection Tool State
   const [isPointSelectionMode, setIsPointSelectionMode] = useState(false);
   const [pointSelectionData, setPointSelectionData] = useState(null);
+
+  // Helper to get headers
+  const getAuthHeaders = () => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+      }
+      return headers;
+  };
 
   // Initialize Map - Center on Hue
   useEffect(() => {
@@ -105,7 +114,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   useEffect(() => {
     const fetchFloodStatus = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/admin/flood-depth-status`);
+            const res = await fetch(`${API_BASE_URL}/admin/flood-depth-status`, {
+                headers: getAuthHeaders()
+            });
             const json = await res.json();
             
             if (json.success && Array.isArray(json.data)) {
@@ -185,7 +196,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     const fetchCriticalZoneDetails = async (id, depthMm) => {
         try {
-            const res = await fetch(`${API_BASE_URL}/admin/get-board/${id}`);
+            const res = await fetch(`${API_BASE_URL}/admin/get-board/${id}`, {
+                headers: getAuthHeaders()
+            });
             const json = await res.json();
             
             if (json.success && json.data) {
@@ -223,7 +236,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     fetchFloodStatus();
     const intervalId = setInterval(fetchFloodStatus, 10000); // Poll every 10s
     return () => clearInterval(intervalId);
-  }, [zones, selectedZoneId, selectionCoords, onCriticalZonesUpdate, onStatsUpdate]); 
+  }, [zones, selectedZoneId, selectionCoords, onCriticalZonesUpdate, onStatsUpdate, token]); 
 
   // Handle FlyTo Zone (Bounds or Lat/Lng)
   useEffect(() => {
@@ -308,7 +321,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
         const res = await fetch(`${API_BASE_URL}/admin/selected-area`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(payload),
             signal
         });
@@ -317,7 +330,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         if (json.success && json.data.wards) {
             const fetchPromises = json.data.wards.map(async (ward) => {
                 try {
-                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { signal });
+                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { 
+                        signal,
+                        headers: getAuthHeaders()
+                    });
                     const detailJson = await detailRes.json();
                     
                     if (detailJson.success && detailJson.data) {
@@ -384,7 +400,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           
           const response = await fetch(`${API_BASE_URL}/admin/point-district`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(),
               body: JSON.stringify(payload)
           });
           const result = await response.json();
