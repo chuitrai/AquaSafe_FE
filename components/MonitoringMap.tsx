@@ -262,11 +262,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 if (idsToFetch.length > 0) {
                     // Fetch all missing details to build accurate global stats
                     Promise.all(idsToFetch.map(item => fetchZoneDetails(item.id, item.depthMm)));
-                } else {
-                    // If no new data to fetch, and no specific zone is selected, update global stats immediately
-                    if (!selectedZoneId && !selectionCoords) {
-                        calculateAndSetGlobalStats();
-                    }
                 }
             }
         } catch (err) {
@@ -442,6 +437,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 try {
                     // Check cache first for population
                     let pop = populationCacheRef.current[ward.id];
+                    console.log("Ward ID:", ward.id, "Cached Population:", pop);
                     let detailJson;
 
                     // If not in cache or we need geometry anyway, fetch it
