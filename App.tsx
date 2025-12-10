@@ -30,6 +30,7 @@ const App = () => {
       setIsLoggedIn(false);
       setToken(null);
       setSearchLocation(null);
+      setTimeFrame({ id: 'now', label: 'Hiện tại' });
       setCurrentView('monitoring');
     } else {
       // Go to Login Page
