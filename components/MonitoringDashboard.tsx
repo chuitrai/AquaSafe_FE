@@ -41,17 +41,19 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
           const updatedList = Array.from(map.values());
 
           // Sort Logic: 
-          // 1. Severity (Critical > High > Medium)
-          // 2. Level (Highest first)
-          // 3. Recently Updated
+          // 1. Recently Updated (Newest first) - PRIMARY
+          // 2. Severity (Critical > High > Medium) - SECONDARY
           return updatedList.sort((a, b) => {
+              // Priority 1: Time (Newest on top)
+              const timeDiff = b.timestamp - a.timestamp;
+              if (timeDiff !== 0) return timeDiff;
+
+              // Priority 2: Severity (Tie-breaker)
               const severityScore = { 'critical': 3, 'high': 2, 'medium': 1, 'low': 0 };
               const scoreA = severityScore[a.severity] || 0;
               const scoreB = severityScore[b.severity] || 0;
-
-              if (scoreA !== scoreB) return scoreB - scoreA;
-              if (parseFloat(b.level) !== parseFloat(a.level)) return parseFloat(b.level) - parseFloat(a.level);
-              return b.timestamp - a.timestamp;
+              
+              return scoreB - scoreA;
           });
       });
   };
