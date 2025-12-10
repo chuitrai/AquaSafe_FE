@@ -13,6 +13,47 @@ const getZoneLatLng = (x, y) => {
   return [lat, lng];
 };
 
+// --- CONVEX HULL ALGORITHM (Monotone Chain) ---
+// Sorts points to draw a clean polygon without crossing lines
+const getConvexHull = (points) => {
+    if (points.length < 3) return points;
+
+    // 1. Sort points by longitude (x), then latitude (y)
+    const sortedPoints = [...points].sort((a, b) => {
+        return a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon;
+    });
+
+    // Cross product of vectors OA and OB
+    // A positive cross product indicates a "left" turn, zero a straight line, and negative a "right" turn.
+    const crossProduct = (o, a, b) => {
+        return (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
+    };
+
+    // 2. Build lower hull
+    const lower = [];
+    for (const point of sortedPoints) {
+        while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+            lower.pop();
+        }
+        lower.push(point);
+    }
+
+    // 3. Build upper hull
+    const upper = [];
+    for (let i = sortedPoints.length - 1; i >= 0; i--) {
+        const point = sortedPoints[i];
+        while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+            upper.pop();
+        }
+        upper.push(point);
+    }
+
+    // 4. Concatenate (remove duplicate start/end points)
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
+};
+
 // Mock Rescue Teams
 const MOCK_RESCUE_TEAMS = [
     { id: 'R1', x: 52, y: 48, name: "Đội CH #01", status: "busy" },
@@ -33,18 +74,18 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
-  const rescueMarkersRef = useRef([]); // Store rescue team markers
-  const reliefMarkersRef = useRef([]); // Store relief point markers
+  const rescueMarkersRef = useRef([]); 
+  const reliefMarkersRef = useRef([]); 
   
   // Selection Area Refs
-  const selectionRectRef = useRef(null); // Ref for the rectangle layer
-  const borderLayersRef = useRef([]); // Ref to store drawn API border layers (Rectangle mode)
+  const selectionRectRef = useRef(null);
+  const borderLayersRef = useRef([]); 
   
   // Point Selection Refs
-  const pointSelectionLayerRef = useRef(L.layerGroup()); // Ref to store point marker and polygon
+  const pointSelectionLayerRef = useRef(L.layerGroup()); 
   
-  const abortControllerRef = useRef(null); // Ref to manage API cancellation
-  const searchMarkerRef = useRef(null); // Ref specifically for the search result pin
+  const abortControllerRef = useRef(null);
+  const searchMarkerRef = useRef(null);
 
   const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
@@ -70,36 +111,30 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // 1. Create Map Instance centered on Ho Chi Minh City
     const map = L.map(mapContainerRef.current, {
-      zoomControl: false, // We use custom buttons
+      zoomControl: false,
       attributionControl: false
     }).setView([10.762622, 106.660172], 12);
 
     mapInstanceRef.current = map;
 
-    // 2. Add OpenStreetMap Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
     }).addTo(map);
 
-    // 3. Add Attribution (Clean look)
     L.control.attribution({
       position: 'bottomright',
       prefix: 'OSM'
     }).addTo(map);
 
-    // 4. Add Layer Group for Point Selection
     pointSelectionLayerRef.current.addTo(map);
 
-    // 5. Wait for map to be fully ready before loading heatmap
     map.whenReady(() => {
         if (!heatmapData) {
             loadFloodHeatmap(map);
         }
     });
 
-    // Cleanup
     return () => {
       map.remove();
       mapInstanceRef.current = null;
@@ -109,7 +144,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
   }, []);
 
-  // Handle FlyTo Zone when selectedZoneId changes
+  // Handle FlyTo Zone
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !selectedZoneId) return;
@@ -118,13 +153,11 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     if (selectedZone) {
         const [lat, lng] = getZoneLatLng(selectedZone.x, selectedZone.y);
         
-        // Fly to location
         map.flyTo([lat, lng], 15, {
             animate: true,
             duration: 1.2
         });
 
-        // Open Popup for the specific marker
         const marker = markersRef.current[selectedZoneId];
         if (marker) {
             marker.openPopup();
@@ -137,14 +170,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // 1. Manage Rescue Teams
     rescueMarkersRef.current.forEach(m => m.remove());
     rescueMarkersRef.current = [];
 
     if (activeLayers && activeLayers.includes('Đội cứu hộ')) {
         MOCK_RESCUE_TEAMS.forEach(team => {
             const [lat, lng] = getZoneLatLng(team.x, team.y);
-            
             const colorClass = team.status === 'busy' ? 'bg-red-500' : 'bg-green-500';
             const iconHtml = `
                 <div class="relative flex items-center justify-center">
@@ -153,16 +184,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     </div>
                 </div>
             `;
-
             const icon = L.divIcon({
                 html: iconHtml,
                 className: 'custom-div-icon',
                 iconSize: [24, 24],
                 iconAnchor: [12, 12]
             });
-
             const marker = L.marker([lat, lng], { icon }).addTo(map);
-            
             const popupContent = `
                 <div class="font-sans min-w-[120px]">
                     <h4 class="font-bold text-sm text-gray-800">${team.name}</h4>
@@ -172,24 +200,20 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </div>
             `;
             marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
-            
             rescueMarkersRef.current.push(marker);
         });
     }
 
-    // 2. Manage Relief Points
     reliefMarkersRef.current.forEach(m => m.remove());
     reliefMarkersRef.current = [];
 
     if (activeLayers && activeLayers.includes('Điểm cứu trợ')) {
         MOCK_RELIEF_POINTS.forEach(point => {
             const [lat, lng] = getZoneLatLng(point.x, point.y);
-            
             let iconName = 'home';
             let bgClass = 'bg-blue-600';
             if (point.type === 'food') { iconName = 'inventory_2'; bgClass = 'bg-green-600'; }
             if (point.type === 'medical') { iconName = 'medical_services'; bgClass = 'bg-red-500'; }
-            
             const iconHtml = `
                 <div class="relative flex items-center justify-center">
                      <div class="w-7 h-7 rounded-full shadow-lg border-2 border-white ${bgClass} flex items-center justify-center">
@@ -198,16 +222,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     <div class="absolute -bottom-1 w-2 h-2 bg-white rotate-45 border-r border-b border-gray-200"></div>
                 </div>
             `;
-
             const icon = L.divIcon({
                 html: iconHtml,
                 className: 'custom-div-icon',
                 iconSize: [28, 28],
                 iconAnchor: [14, 30]
             });
-
             const marker = L.marker([lat, lng], { icon }).addTo(map);
-
             const popupContent = `
                 <div class="font-sans min-w-[140px]">
                     <div class="flex items-center gap-1 mb-1">
@@ -221,7 +242,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </div>
             `;
             marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
-
             reliefMarkersRef.current.push(marker);
         });
     }
@@ -270,32 +290,24 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
   }, [searchLocation]);
 
-  // Load flood depth heatmap from API
   const loadFloodHeatmap = async (map, retryCount = 0) => {
     if (!map) return;
-
     setIsLoadingHeatmap(true);
     setHeatmapError(null);
-
     try {
       const timeParam = timeFrame ? `&time=${timeFrame.id}` : '';
       const response = await fetch(`${API_BASE_URL}/flood-depth/map?t=${Date.now()}${timeParam}`);
       const result = await response.json();
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to load heatmap');
-      }
+      if (!result.success) throw new Error(result.error || 'Failed to load heatmap');
 
       setHeatmapData(result.data);
-      
       const bounds = L.latLngBounds(
         [result.data.bounds.south, result.data.bounds.west],
         [result.data.bounds.north, result.data.bounds.east]
       );
 
-      if (heatmapOverlayRef.current) {
-        heatmapOverlayRef.current.remove();
-      }
+      if (heatmapOverlayRef.current) heatmapOverlayRef.current.remove();
 
       const imagePath = result.data.image_url.startsWith('http') 
         ? result.data.image_url 
@@ -309,23 +321,17 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         crossOrigin: true
       });
 
-      if (showHeatmap) {
-        heatmapOverlayRef.current.addTo(map);
-      }
+      if (showHeatmap) heatmapOverlayRef.current.addTo(map);
 
     } catch (err) {
       console.error('Error loading flood heatmap:', err);
-      if (retryCount < 2) {
-          setTimeout(() => loadFloodHeatmap(map, retryCount + 1), 2000);
-      } else {
-          setHeatmapError('Không thể tải bản đồ nhiệt');
-      }
+      if (retryCount < 2) setTimeout(() => loadFloodHeatmap(map, retryCount + 1), 2000);
+      else setHeatmapError('Không thể tải bản đồ nhiệt');
     } finally {
       setIsLoadingHeatmap(false);
     }
   };
 
-  // Function to calculate region flood depth
   const calculateRegionFloodDepth = async (bounds) => {
     try {
       const payload = {
@@ -340,26 +346,19 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
       const result = await response.json();
-
-      if (result.success && result.data) {
-        return result.data;
-      }
+      if (result.success && result.data) return result.data;
     } catch (error) {
       console.error('Error calculating region flood depth:', error);
     }
     return null;
   };
 
-  // Function to fetch and draw borders
   const fetchAndDrawBorders = async (bounds) => {
     const map = mapInstanceRef.current;
     if (!map) return null;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -393,8 +392,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     if (detailJson.success && detailJson.data) {
                         if (detailJson.data.members) {
                             detailJson.data.members.forEach((m) => {
-                                if (m.geometry && m.geometry.length > 1) {
-                                    const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
+                                if (m.geometry && m.geometry.length > 2) {
+                                    // Use Convex Hull for Rectangle Selection borders as well
+                                    const hullPoints = getConvexHull(m.geometry);
+                                    const latlngs = hullPoints.map((p) => [p.lat, p.lon]);
                                     const polyline = L.polyline(latlngs, {
                                         color: "#ef4444",
                                         weight: 2,
@@ -411,24 +412,18 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             pop = parseInt(rawPop, 10);
                             if (isNaN(pop)) pop = 0;
                         }
-
                         return { pop };
                     }
-                } catch (err) {
-                   // silent fail
-                }
+                } catch (err) { }
                 return { pop: 0 };
             });
 
             const results = await Promise.all(fetchPromises);
             const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
-
             return { totalPopulation };
         }
     } catch (error) {
-        if (error.name !== 'AbortError') {
-            console.error("Error fetching borders:", error);
-        }
+        if (error.name !== 'AbortError') console.error("Error fetching borders:", error);
     }
     return null;
   };
@@ -438,8 +433,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       const map = mapInstanceRef.current;
       if (!map) return;
 
-      setIsLoadingBorders(true); // Reusing loading state
-      pointSelectionLayerRef.current.clearLayers(); // Clear previous selection
+      setIsLoadingBorders(true);
+      pointSelectionLayerRef.current.clearLayers();
 
       try {
           const payload = { lat, lng };
@@ -452,34 +447,43 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           const result = await response.json();
 
           if (result.success && result.data) {
-              const { district, geometry, properties, point } = result.data;
+              const { geometry, point } = result.data;
 
-              // 1. Draw Polygon
-              if (geometry && geometry.length > 0) {
-                  const latlngs = geometry.map(p => [p.lat, p.lon]);
+              // 1. Draw Polygon - Clean Style with Convex Hull
+              if (geometry && geometry.length > 2) {
+                  // Apply Convex Hull Algorithm here
+                  const hullPoints = getConvexHull(geometry);
+                  const latlngs = hullPoints.map(p => [p.lat, p.lon]);
+                  
                   L.polygon(latlngs, {
-                      color: "#9333ea", // Purple
-                      weight: 3,
-                      fillColor: "#9333ea",
-                      fillOpacity: 0.15,
-                      dashArray: "5, 5"
+                      color: "#9333ea", // Purple-600
+                      weight: 4,        // Thicker outline
+                      opacity: 1,
+                      fillColor: "#9333ea", 
+                      fillOpacity: 0.15, // Very light fill
+                      lineCap: 'round',
+                      lineJoin: 'round',
+                      smoothFactor: 1.0
                   }).addTo(pointSelectionLayerRef.current);
+                  
+                  // Zoom to polygon
+                  const bounds = L.latLngBounds(latlngs);
+                  map.flyToBounds(bounds, { padding: [80, 80], duration: 1.2 });
               }
 
               // 2. Draw Point Marker
               const icon = L.divIcon({
                   html: `
                     <div class="relative flex items-center justify-center -translate-y-1">
-                        <span class="material-symbols-outlined text-purple-600 !text-[32px] drop-shadow-md">location_on</span>
+                        <span class="material-symbols-outlined text-purple-600 !text-[36px] drop-shadow-md">location_on</span>
                     </div>
                   `,
                   className: 'custom-div-icon',
-                  iconSize: [32, 32],
-                  iconAnchor: [16, 30]
+                  iconSize: [36, 36],
+                  iconAnchor: [18, 34]
               });
               L.marker([point.lat, point.lng], { icon }).addTo(pointSelectionLayerRef.current);
 
-              // 3. Update State
               setPointSelectionData(result.data);
           } else {
              console.error("Failed to get district info:", result.error);
@@ -489,7 +493,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           console.error("Error fetching district by point:", error);
       } finally {
           setIsLoadingBorders(false);
-          setIsPointSelectionMode(false); // Disable mode after selection
+          setIsPointSelectionMode(false);
       }
   };
 
@@ -499,17 +503,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     if (!map || !heatmapOverlayRef.current) return;
     
     if (showHeatmap) {
-      if (!map.hasLayer(heatmapOverlayRef.current)) {
-        heatmapOverlayRef.current.addTo(map);
-      }
+      if (!map.hasLayer(heatmapOverlayRef.current)) heatmapOverlayRef.current.addTo(map);
     } else {
-      if (map.hasLayer(heatmapOverlayRef.current)) {
-        heatmapOverlayRef.current.remove();
-      }
+      if (map.hasLayer(heatmapOverlayRef.current)) heatmapOverlayRef.current.remove();
     }
   }, [showHeatmap]);
 
-  // Effect to update heatmap opacity
   useEffect(() => {
     if (heatmapOverlayRef.current) {
       heatmapOverlayRef.current.setOpacity(heatmapOpacity);
@@ -521,11 +520,10 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Only active if rectangle mode is on
     if (isSelectionMode) {
       map.dragging.disable();
       map.getContainer().style.cursor = 'crosshair';
-    } else if (!isPointSelectionMode) { // Only reset if point mode is also off
+    } else if (!isPointSelectionMode) {
       map.dragging.enable();
       map.getContainer().style.cursor = '';
       isDrawingRef.current = false;
@@ -623,7 +621,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       if (!map) return;
 
       if (isPointSelectionMode) {
-          map.getContainer().style.cursor = 'help'; // Use help or crosshair
+          map.getContainer().style.cursor = 'help';
       } else if (!isSelectionMode) {
           map.getContainer().style.cursor = '';
       }
@@ -640,7 +638,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       };
   }, [isPointSelectionMode]);
 
-
   // Handle Markers (Zones)
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -651,7 +648,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     zones.forEach(zone => {
       const [lat, lng] = getZoneLatLng(zone.x, zone.y);
-
       let colorClass = 'bg-blue-500';
       let ringClass = 'ring-blue-500';
       if (zone.severity === 'critical') { colorClass = 'bg-red-600'; ringClass = 'ring-red-600'; }
@@ -669,26 +665,21 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             <div class="relative ${size} rounded-full transition-all duration-300 ${colorClass} ${ring}"></div>
         </div>
       `;
-
       const icon = L.divIcon({
         html: html,
         className: 'custom-div-icon', 
         iconSize: [24, 24],
         iconAnchor: [12, 12]
       });
-
       const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
-      
       marker.on('click', (e) => {
-        if (isSelectionMode || isPointSelectionMode) return; // Disable zone selection during tool usage
+        if (isSelectionMode || isPointSelectionMode) return;
         L.DomEvent.stopPropagation(e);
         onZoneSelect(zone.id);
       });
-
       const popupContent = `<div class="font-bold text-sm">${zone.location}</div>`;
       marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
       if (isSelected) marker.openPopup();
-
       markersRef.current[zone.id] = marker;
     });
   }, [zones, selectedZoneId, onZoneSelect, isSelectionMode, isPointSelectionMode]);
@@ -794,7 +785,14 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-purple-200 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full ring-1 ring-purple-100">
              <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
                 <span className="material-symbols-outlined text-purple-600">location_on</span>
-                <span className="font-bold text-gray-800 text-sm">Thông Tin Điểm Chọn</span>
+                <div className="flex flex-col">
+                    <span className="font-bold text-gray-800 text-sm leading-tight">
+                        {pointSelectionData.nominatim_info?.display_name?.split(',')[0] || pointSelectionData.district.name}
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                        {pointSelectionData.nominatim_info?.address?.city_district || pointSelectionData.district.type}
+                    </span>
+                </div>
                 <button 
                   onClick={() => {
                     setPointSelectionData(null);
@@ -806,48 +804,98 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </button>
              </div>
 
-             <div className="space-y-3">
-                 <div className="flex justify-between items-start">
-                     <div>
-                         <h3 className="text-lg font-bold text-gray-800 leading-tight">{pointSelectionData.district.name}</h3>
-                         <p className="text-xs text-gray-500">{pointSelectionData.district.type} - Level {pointSelectionData.district.admin_level}</p>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {/* Left Column: Stats */}
+                 <div className="space-y-2">
+                     <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                            <p className="text-[10px] text-gray-500 uppercase">Dân số</p>
+                            <p className="font-bold text-gray-800">
+                                {pointSelectionData.properties.population.toLocaleString()}
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                             <p className="text-[10px] text-gray-500 uppercase">Diện tích</p>
+                             <p className="font-bold text-gray-800">
+                                 {pointSelectionData.properties.area_km2} km²
+                             </p>
+                        </div>
                      </div>
-                     <div className="text-right">
-                         <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                             ID: {pointSelectionData.district.id}
-                         </span>
+                     
+                     <div className="bg-blue-50 p-2 rounded-lg border border-blue-100">
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] text-blue-500 uppercase font-bold">Độ ngập trung bình</span>
+                            <span className="font-bold text-blue-700 text-lg">
+                                {pointSelectionData.flood_analysis?.average_depth 
+                                  ? `${pointSelectionData.flood_analysis.average_depth.toFixed(3)}m`
+                                  : 'N/A'}
+                            </span>
+                        </div>
+                        <div className="flex gap-2 text-[10px] text-gray-500">
+                             <span>Max: {pointSelectionData.flood_analysis?.max_depth || 0}m</span>
+                             <span>•</span>
+                             <span>Phủ: {pointSelectionData.flood_analysis?.coverage_percentage || 0}%</span>
+                        </div>
                      </div>
                  </div>
 
-                 <div className="grid grid-cols-2 gap-3">
-                   <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex flex-col justify-center">
-                     <div className="flex items-center gap-1.5 mb-1">
-                        <span className="material-symbols-outlined text-gray-400 !text-[16px]">groups</span>
-                        <p className="text-[10px] text-gray-500 font-semibold uppercase">Dân Số</p>
+                 {/* Right Column: Flood Distribution Bar Chart */}
+                 <div className="flex flex-col h-full justify-between">
+                     <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Phân bố ngập lụt</p>
+                     
+                     <div className="flex items-end justify-between gap-1 h-24 w-full pr-1">
+                        {[
+                            { 
+                                id: 'no_flood', 
+                                label: 'Không', 
+                                color: 'bg-gray-300', 
+                                value: pointSelectionData.flood_analysis?.flood_distribution?.no_flood?.percentage || 0 
+                            },
+                            { 
+                                id: 'shallow', 
+                                label: 'Nhẹ', 
+                                color: 'bg-blue-300', 
+                                value: pointSelectionData.flood_analysis?.flood_distribution?.shallow?.percentage || 0 
+                            },
+                            { 
+                                id: 'moderate', 
+                                label: 'Vừa', 
+                                color: 'bg-blue-500', 
+                                value: pointSelectionData.flood_analysis?.flood_distribution?.moderate?.percentage || 0 
+                            },
+                            { 
+                                id: 'deep', 
+                                label: 'Sâu', 
+                                color: 'bg-blue-700', 
+                                value: pointSelectionData.flood_analysis?.flood_distribution?.deep?.percentage || 0 
+                            },
+                            { 
+                                id: 'very_deep', 
+                                label: 'R.Sâu', 
+                                color: 'bg-purple-800', 
+                                value: pointSelectionData.flood_analysis?.flood_distribution?.very_deep?.percentage || 0 
+                            }
+                        ].map((item) => (
+                            <div key={item.id} className="flex flex-col items-center flex-1 group relative">
+                                <div className="absolute -top-8 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                    {item.value.toFixed(1)}%
+                                </div>
+                                <div className="w-full bg-gray-100 rounded-t-sm relative h-20 overflow-hidden">
+                                    <div 
+                                        className={`absolute bottom-0 left-0 w-full transition-all duration-500 ease-out ${item.color}`}
+                                        style={{ height: `${item.value}%` }}
+                                    ></div>
+                                </div>
+                                <span className="text-[9px] text-gray-500 mt-1 font-medium">{item.label}</span>
+                            </div>
+                        ))}
                      </div>
-                     <p className="font-bold text-gray-800 text-lg">
-                        {pointSelectionData.properties.population.toLocaleString()}
-                     </p>
-                   </div>
-                   <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex flex-col justify-center">
-                     <div className="flex items-center gap-1.5 mb-1">
-                        <span className="material-symbols-outlined text-blue-400 !text-[16px]">water</span>
-                        <p className="text-[10px] text-blue-500 font-semibold uppercase">Độ Ngập Hiện Tại</p>
-                     </div>
-                     <p className="font-bold text-blue-700 text-lg">
-                        {pointSelectionData.properties.flood_depth}m
-                     </p>
-                   </div>
-                 </div>
-                 
-                 <div className="flex items-center gap-2 text-[10px] text-gray-400 justify-end pt-1">
-                     <span>Diện tích: {pointSelectionData.properties.area_km2} km²</span>
                  </div>
              </div>
           </div>
         )}
 
-        {/* Heatmap Controls & Legend (Same as before) */}
+        {/* Heatmap Controls & Legend */}
         {showHeatmap && heatmapData && !isLoadingHeatmap && (
             <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/50 w-64">
                 <div className="flex justify-between items-start mb-3">
@@ -863,22 +911,18 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </div>
                 
                 <div className="space-y-2">
-                    {/* Gradient Bar */}
                     <div 
                         className="h-3 rounded-full border border-gray-200 shadow-inner w-full"
                         style={{
                             background: `linear-gradient(to right, ${heatmapData.legend?.colors?.join(', ') || '#ccc'})`
                         }}
                     ></div>
-                    
-                    {/* Values */}
                     <div className="flex justify-between text-[10px] font-medium text-gray-600">
                         <span>{heatmapData.legend?.values[0]?.toFixed(1)}m</span>
                         <span>{(heatmapData.legend?.values[2] || 0.5).toFixed(1)}m</span>
                         <span>{(heatmapData.legend?.values[4] || 1.5).toFixed(1)}m</span>
                     </div>
 
-                    {/* Opacity Slider */}
                     <div className="pt-2 mt-2 border-t border-gray-100">
                          <div className="flex justify-between text-[10px] text-gray-500 mb-1">
                             <span>Độ mờ</span>
@@ -919,7 +963,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </button>
             </div>
 
-            {/* Rectangle Selection Tool */}
             <button 
                 onClick={() => {
                     setIsSelectionMode(!isSelectionMode);
@@ -939,7 +982,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 </span>
             </button>
 
-            {/* Point Selection Tool */}
             <button 
                 onClick={() => {
                     setIsPointSelectionMode(!isPointSelectionMode);
