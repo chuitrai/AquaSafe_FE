@@ -26,9 +26,10 @@ const App = () => {
 
   const handleLoginToggle = () => {
     if (isLoggedIn) {
-      // Logout logic
+      // Logout logic: Reset ALL states
       setIsLoggedIn(false);
       setToken(null);
+      setSearchLocation(null);
       setCurrentView('monitoring');
     } else {
       // Go to Login Page

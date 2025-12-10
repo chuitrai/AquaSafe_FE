@@ -56,8 +56,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
   const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
-  // Real-time Flood Status
+  // Real-time Flood Status & Population Cache
   const floodStatusRef = useRef({});
+  const populationCacheRef = useRef({}); // Cache population data to avoid re-fetching
   
   // Rectangle Selection Tool State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -76,6 +77,50 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           headers['Authorization'] = `Bearer ${token}`;
       }
       return headers;
+  };
+
+  // Helper to calculate and set global stats based on all available data
+  const calculateAndSetGlobalStats = () => {
+      if (!onStatsUpdate) return;
+
+      const statusMap = floodStatusRef.current;
+      const popMap = populationCacheRef.current;
+      
+      const ids = Object.keys(statusMap);
+      if (ids.length === 0) {
+          onStatsUpdate(null);
+          return;
+      }
+
+      let totalDepthMm = 0;
+      let totalPopulation = 0;
+      let validDepthCount = 0;
+
+      ids.forEach(id => {
+          const depth = statusMap[id] || 0;
+          totalDepthMm += depth;
+          validDepthCount++;
+          
+          if (popMap[id]) {
+              totalPopulation += popMap[id];
+          }
+      });
+
+      const avgFloodDepthMm = validDepthCount > 0 ? totalDepthMm / validDepthCount : 0;
+      
+      // If we don't have population for most items yet, fallback estimate won't be used if we fetch everything.
+      // But purely for safety:
+      if (totalPopulation === 0 && validDepthCount > 0) {
+          // Fallback only if cache is empty (shouldn't happen with new logic)
+          totalPopulation = validDepthCount * 5000; 
+      }
+
+      onStatsUpdate({
+          population: totalPopulation,
+          avgFloodLevel: (avgFloodDepthMm / 1000).toFixed(2),
+          food: (totalPopulation * 0.05 / 1000).toFixed(1),
+          workers: Math.floor(totalPopulation / 1000) + 20
+      });
   };
 
   // Initialize Map - Center on Hue
@@ -101,6 +146,31 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     pointSelectionLayerRef.current.addTo(map);
 
+    // Click handler for deselection
+    map.on('click', (e) => {
+        // If we are in drawing mode, do nothing (handled by other listeners)
+        if (isSelectionMode || isPointSelectionMode) return;
+
+        // Deselect Zone
+        onZoneSelect(null);
+
+        // Deselect Rect
+        setSelectionCoords(null);
+        if (selectionRectRef.current) {
+            selectionRectRef.current.remove();
+            selectionRectRef.current = null;
+        }
+        borderLayersRef.current.forEach(layer => layer.remove());
+        borderLayersRef.current = [];
+
+        // Clear Point Selection
+        setPointSelectionData(null);
+        pointSelectionLayerRef.current.clearLayers();
+
+        // Recalculate Global Stats
+        calculateAndSetGlobalStats();
+    });
+
     return () => {
       map.remove();
       mapInstanceRef.current = null;
@@ -108,7 +178,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [isSelectionMode, isPointSelectionMode]); // Re-bind if modes change, but actually internal refs handle it. simplified deps.
 
   // Polling Flood Depth Status & Update Zones
   useEffect(() => {
@@ -121,21 +191,22 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             
             if (json.success && Array.isArray(json.data)) {
                 const updates = [];
-                const newFetches = [];
-                let totalDepth = 0;
-                let validCount = 0;
-
+                const idsToFetch = [];
+                
                 json.data.forEach(item => {
                     const id = item.id;
                     const newDepthMm = item.depth || 0;
                     const oldDepthMm = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepthMm;
                     
-                    // Update Ref
+                    // Update Flood Status Ref
                     floodStatusRef.current[id] = newDepthMm;
-                    totalDepth += newDepthMm;
-                    validCount++;
 
-                    // Logic to detect changes
+                    // If we don't have population data for this ID, mark it for fetching
+                    if (populationCacheRef.current[id] === undefined) {
+                        idsToFetch.push({ id, depthMm: newDepthMm });
+                    }
+
+                    // Logic to detect changes for Critical Zones
                     const isRising = newDepthMm > oldDepthMm;
                     const isFalling = newDepthMm < oldDepthMm;
                     
@@ -156,12 +227,14 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                                 level: (newDepthMm / 1000).toFixed(1),
                                 severity: severity,
                                 status: isRising ? 'rising' : (isFalling ? 'falling' : 'stable'),
-                                timestamp: Date.now() // Update timestamp for Sidebar
+                                timestamp: Date.now() 
                             });
                         }
                     } else if (newDepthMm > 200) {
-                        // New potential zone (only care if > 200mm to avoid spam)
-                        newFetches.push({ id, depthMm: newDepthMm });
+                        // New potential zone (only care if > 200mm to avoid spam in sidebar)
+                        // This logic is separate from fetching details for population
+                        // We will let the "idsToFetch" logic handle data retrieval, 
+                        // but here we mark it as "needs zone creation"
                     }
                 });
 
@@ -170,23 +243,16 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     onCriticalZonesUpdate(updates);
                 }
 
-                // Fetch details for NEW high-risk zones
-                newFetches.forEach(item => {
-                    fetchCriticalZoneDetails(item.id, item.depthMm);
-                });
-
-                // Update Global Stats if no specific selection
-                if (!selectedZoneId && !selectionCoords && onStatsUpdate) {
-                    const globalAvgDepthMm = validCount > 0 ? totalDepth / validCount : 0;
-                    const globalAvgDepthM = globalAvgDepthMm / 1000;
-                    const estimatedPop = validCount * 12500; 
-
-                    onStatsUpdate({
-                        population: estimatedPop,
-                        avgFloodLevel: globalAvgDepthM.toFixed(2),
-                        food: (estimatedPop * 0.05 / 1000).toFixed(1),
-                        workers: Math.floor(estimatedPop / 2000) + 10
-                    });
+                // Fetch details for ALL new IDs (to get population for global stats)
+                // We process them in parallel
+                if (idsToFetch.length > 0) {
+                    // Fetch all missing details to build accurate global stats
+                    Promise.all(idsToFetch.map(item => fetchZoneDetails(item.id, item.depthMm)));
+                } else {
+                    // If no new data to fetch, and no specific zone is selected, update global stats immediately
+                    if (!selectedZoneId && !selectionCoords) {
+                        calculateAndSetGlobalStats();
+                    }
                 }
             }
         } catch (err) {
@@ -194,7 +260,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         }
     };
 
-    const fetchCriticalZoneDetails = async (id, depthMm) => {
+    const fetchZoneDetails = async (id, depthMm) => {
         try {
             const res = await fetch(`${API_BASE_URL}/admin/get-board/${id}`, {
                 headers: getAuthHeaders()
@@ -207,29 +273,45 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 const province = "Thừa Thiên Huế"; 
                 const levelM = (depthMm / 1000).toFixed(1);
                 
+                // 1. Cache Population
+                let pop = 0;
+                if (tags && tags.population) {
+                    const rawPop = tags.population.toString().replace(/,/g, '');
+                    pop = parseInt(rawPop, 10);
+                }
+                if (isNaN(pop)) pop = 0;
+                populationCacheRef.current[id] = pop;
+
+                // 2. Create Critical Zone if severity matches
                 let severity = 'low';
                 if (depthMm > 1000) severity = 'critical';
                 else if (depthMm > 500) severity = 'high';
                 else if (depthMm > 200) severity = 'medium';
 
-                const newZone = {
-                    id: id,
-                    location: name,
-                    district: province,
-                    level: levelM,
-                    severity: severity,
-                    timestamp: Date.now(), // Use numeric timestamp
-                    status: 'rising', // Default to rising when first detected high
-                    bounds: bounds,
-                    rawData: json.data 
-                };
-                
-                if (onCriticalZonesUpdate) {
-                    onCriticalZonesUpdate([newZone]);
+                if (severity !== 'low') {
+                    const newZone = {
+                        id: id,
+                        location: name,
+                        district: province,
+                        level: levelM,
+                        severity: severity,
+                        timestamp: Date.now(), 
+                        status: 'rising', 
+                        bounds: bounds,
+                        rawData: json.data 
+                    };
+                    if (onCriticalZonesUpdate) {
+                        onCriticalZonesUpdate([newZone]);
+                    }
+                }
+
+                // 3. Update global stats after fetching (if idle)
+                if (!selectedZoneId && !selectionCoords) {
+                    calculateAndSetGlobalStats();
                 }
             }
         } catch (err) {
-            console.error("Error fetching critical zone details:", err);
+            console.error("Error fetching zone details:", err);
         }
     };
 
@@ -259,6 +341,20 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         
         const marker = markersRef.current[selectedZoneId];
         if (marker) marker.openPopup();
+        
+        // Update stats for the specific zone
+        // We use cached population if available
+        const pop = populationCacheRef.current[selectedZoneId] || 0;
+        const depthMm = floodStatusRef.current[selectedZoneId] || (parseFloat(selectedZone.level) * 1000);
+        
+        if (onStatsUpdate) {
+             onStatsUpdate({
+                population: pop,
+                avgFloodLevel: (depthMm / 1000).toFixed(2),
+                food: (pop * 0.05 / 1000).toFixed(1),
+                workers: Math.floor(pop / 1000) + 5
+            });
+        }
     }
   }, [selectedZoneId, zones]);
 
@@ -330,11 +426,16 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         if (json.success && json.data.wards) {
             const fetchPromises = json.data.wards.map(async (ward) => {
                 try {
+                    // Check cache first for population
+                    let pop = populationCacheRef.current[ward.id];
+                    let detailJson;
+
+                    // If not in cache or we need geometry anyway, fetch it
                     const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { 
                         signal,
                         headers: getAuthHeaders()
                     });
-                    const detailJson = await detailRes.json();
+                    detailJson = await detailRes.json();
                     
                     if (detailJson.success && detailJson.data) {
                         // Draw borders
@@ -352,23 +453,27 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             });
                         }
                         
-                        let pop = 0;
-                        if (detailJson.data.tags && detailJson.data.tags.population) {
+                        // Parse Population if not cached
+                        if (pop === undefined && detailJson.data.tags && detailJson.data.tags.population) {
                             const rawPop = detailJson.data.tags.population.toString().replace(/,/g, '');
                             pop = parseInt(rawPop, 10);
-                            if (isNaN(pop)) pop = 0;
+                            if (!isNaN(pop)) {
+                                populationCacheRef.current[ward.id] = pop; // Update Cache
+                            }
                         }
-
-                        let depthMm = 0;
-                        if (floodStatusRef.current && floodStatusRef.current[ward.id] !== undefined) {
-                            depthMm = floodStatusRef.current[ward.id];
-                        } else if (detailJson.data.tags && detailJson.data.tags.flood_depth) {
-                            depthMm = parseFloat(detailJson.data.tags.flood_depth);
-                        }
-                        if (isNaN(depthMm)) depthMm = 0;
-
-                        return { pop, depthMm };
                     }
+                    
+                    if (pop === undefined) pop = 0;
+
+                    let depthMm = 0;
+                    if (floodStatusRef.current && floodStatusRef.current[ward.id] !== undefined) {
+                        depthMm = floodStatusRef.current[ward.id];
+                    } else if (detailJson?.data?.tags?.flood_depth) {
+                        depthMm = parseFloat(detailJson.data.tags.flood_depth);
+                    }
+                    if (isNaN(depthMm)) depthMm = 0;
+
+                    return { pop, depthMm };
                 } catch (err) { }
                 return { pop: 0, depthMm: 0 };
             });
@@ -377,7 +482,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             
             const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
             const totalDepthMm = results.reduce((sum, curr) => sum + curr.depthMm, 0);
-            const avgFloodDepthMm = results.length > 0 ? totalDepthMm / results.length : 0;
+            const validCount = results.filter(r => r.depthMm > 0 || r.pop > 0).length; // Rough filter for average
+            const avgFloodDepthMm = validCount > 0 ? totalDepthMm / validCount : 0;
             const avgFloodDepthM = avgFloodDepthMm / 1000;
 
             return { totalPopulation, avgFloodDepth: avgFloodDepthM };
@@ -714,23 +820,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     }
                     borderLayersRef.current.forEach(layer => layer.remove());
                     borderLayersRef.current = [];
-                    if (onStatsUpdate) {
-                         const statusMap = floodStatusRef.current;
-                         if (Object.keys(statusMap).length > 0) {
-                             let totalDepth = 0;
-                             let count = 0;
-                             Object.values(statusMap).forEach(d => { totalDepth += (d as number); count++; });
-                             const estPop = count * 12500;
-                             onStatsUpdate({
-                                population: estPop,
-                                avgFloodLevel: (count > 0 ? (totalDepth/count)/1000 : 0).toFixed(2),
-                                food: (estPop * 0.05 / 1000).toFixed(1),
-                                workers: Math.floor(estPop / 2000) + 10
-                             });
-                         } else {
-                             onStatsUpdate(null);
-                         }
-                    }
+                    // Recalculate global stats on deselect
+                    calculateAndSetGlobalStats();
                   }}
                   className="ml-auto hover:bg-gray-100 rounded-full p-1 transition-colors"
                 >
@@ -779,7 +870,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             
             <button 
                onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.setView([16.4637, 107.5909], 12); }}
-               className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-50 ring-1 ring-black/5 transition-colors mt-2">
+               className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-100 ring-1 ring-black/5 transition-colors mt-2">
                 <span className="material-symbols-outlined text-gray-700 !text-[20px]">my_location</span>
             </button>
         </div>
