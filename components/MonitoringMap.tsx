@@ -204,7 +204,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
 
     fetchFloodStatus();
-    const intervalId = setInterval(fetchFloodStatus, 60000); // 1 minute
+    const intervalId = setInterval(fetchFloodStatus, 10000); // 10 seconds
     return () => clearInterval(intervalId);
   }, [selectedZoneId, selectionCoords]); 
 
