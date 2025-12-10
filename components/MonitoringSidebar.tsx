@@ -137,11 +137,11 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
                  </div>
                  <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#f97316] ring-1 ring-white shadow-sm"></span>
-                    <span className="text-xs text-gray-600">Cao (>0.5m)</span>
+                    <span className="text-xs text-gray-600">Cao (&gt;0.5m)</span>
                  </div>
                  <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] ring-1 ring-white shadow-sm"></span>
-                    <span className="text-xs text-gray-600">Nguy hiểm (>1m)</span>
+                    <span className="text-xs text-gray-600">Nguy hiểm (&gt;1m)</span>
                  </div>
             </div>
         </div>
