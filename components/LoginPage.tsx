@@ -11,15 +11,12 @@ export const LoginPage = ({ onLogin, onBack }) => {
     setError('');
     setIsLoading(true);
 
-    // Simulate network delay
-    setTimeout(() => {
-        onLogin(username, password, (isSuccess) => {
-            setIsLoading(false);
-            if (!isSuccess) {
-                setError('Tên đăng nhập hoặc mật khẩu không đúng.');
-            }
-        });
-    }, 800);
+    onLogin(username, password, (isSuccess) => {
+        setIsLoading(false);
+        if (!isSuccess) {
+            setError('Tên đăng nhập hoặc mật khẩu không đúng.');
+        }
+    });
   };
 
   return (
@@ -110,7 +107,7 @@ export const LoginPage = ({ onLogin, onBack }) => {
         </div>
         
         <div className="mt-8 pt-6 border-t border-gray-100 text-center text-xs text-gray-400">
-            &copy; 2024 AquaSafe Monitoring System. <br/> Phiên bản v1.0.2 (Mockup)
+            &copy; 2024 AquaSafe Monitoring System. <br/> Phiên bản v1.0.2
         </div>
       </div>
     </div>

@@ -34,13 +34,29 @@ const App = () => {
     }
   };
 
-  const handleLoginSubmit = (username, password, callback) => {
-      // Hardcoded Mockup Credentials
-      if (username === 'admin_hcm' && password === 'password_hcm') {
-          setIsLoggedIn(true);
-          setCurrentView('analysis'); // Redirect to analysis dashboard on success
-          callback(true);
-      } else {
+  const handleLoginSubmit = async (username, password, callback) => {
+      try {
+          const response = await fetch('http://localhost:8220/api/auth/login', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ username, password }),
+          });
+
+          if (response.ok) {
+              const data = await response.json();
+              // You might want to store the token here if needed for future requests
+              // localStorage.setItem('token', data.token);
+              
+              setIsLoggedIn(true);
+              setCurrentView('analysis'); // Redirect to analysis dashboard on success
+              callback(true);
+          } else {
+              callback(false);
+          }
+      } catch (error) {
+          console.error("Login API error:", error);
           callback(false);
       }
   };
