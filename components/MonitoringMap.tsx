@@ -390,12 +390,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     const detailJson = await detailRes.json();
                     
                     if (detailJson.success && detailJson.data) {
+                        // Draw borders
                         if (detailJson.data.members) {
                             detailJson.data.members.forEach((m) => {
-                                if (m.geometry && m.geometry.length > 2) {
-                                    // Use Convex Hull for Rectangle Selection borders as well
-                                    const hullPoints = getConvexHull(m.geometry);
-                                    const latlngs = hullPoints.map((p) => [p.lat, p.lon]);
+                                if (m.geometry && m.geometry.length > 1) {
+                                    // Use simple polyline for border segments (ways)
+                                    const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
                                     const polyline = L.polyline(latlngs, {
                                         color: "#ef4444",
                                         weight: 2,
@@ -406,21 +406,34 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             });
                         }
                         
+                        // Population
                         let pop = 0;
                         if (detailJson.data.tags && detailJson.data.tags.population) {
                             const rawPop = detailJson.data.tags.population.toString().replace(/,/g, '');
                             pop = parseInt(rawPop, 10);
                             if (isNaN(pop)) pop = 0;
                         }
-                        return { pop };
+
+                        // Flood Depth
+                        let depth = 0;
+                        if (detailJson.data.tags && detailJson.data.tags.flood_depth) {
+                            depth = parseFloat(detailJson.data.tags.flood_depth);
+                            if (isNaN(depth)) depth = 0;
+                        }
+
+                        return { pop, depth };
                     }
                 } catch (err) { }
-                return { pop: 0 };
+                return { pop: 0, depth: 0 };
             });
 
             const results = await Promise.all(fetchPromises);
+            
             const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
-            return { totalPopulation };
+            const totalDepth = results.reduce((sum, curr) => sum + curr.depth, 0);
+            const avgFloodDepth = results.length > 0 ? totalDepth / results.length : 0;
+
+            return { totalPopulation, avgFloodDepth };
         }
     } catch (error) {
         if (error.name !== 'AbortError') console.error("Error fetching borders:", error);
@@ -585,7 +598,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
             if (onStatsUpdate) {
                 const population = wardStats?.totalPopulation || 0;
-                const avgDepth = floodAnalysis?.average_depth || 0;
+                // Use depth from ward tags if available (wardStats.avgFloodDepth), 
+                // fallback to region analysis or 0.
+                const avgDepth = wardStats?.avgFloodDepth || floodAnalysis?.average_depth || 0;
 
                 onStatsUpdate({
                     population: population,
