@@ -559,14 +559,18 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Clear existing
+    // Clear existing markers from map
     Object.values(markersRef.current).forEach((marker: any) => marker.remove());
     markersRef.current = {};
+    
+    // Clear existing polygons from map
     Object.values(polygonLayersRef.current).forEach((layer: any) => layer.remove());
+    // Note: We don't necessarily clear the REF object here, we re-populate it. 
+    // Actually, safer to clear ref so we don't have stale layers.
     polygonLayersRef.current = {};
 
     zones.forEach(zone => {
-      // 1. Draw Boundary Polygon if rawData is available
+      // 1. Prepare Boundary Polygon if rawData is available (BUT DO NOT ADD TO MAP YET)
       if (zone.rawData && zone.rawData.members) {
          // Determine color based on severity
          let color = '#3b82f6'; // blue
@@ -585,11 +589,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 }).addTo(group);
             }
          });
-         group.addTo(map);
+         
+         // Store in ref, don't add to map unless selected
          polygonLayersRef.current[zone.id] = group;
       }
 
-      // 2. Draw Marker at Center
+      // 2. Draw Marker at Center (Always Visible)
       let lat, lng;
       if (zone.bounds) {
           lat = (zone.bounds.minlat + zone.bounds.maxlat) / 2;
@@ -632,7 +637,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             onZoneSelect(zone.id);
           });
           
-          // Time ago logic for popup would need to be computed or passed, using static here for map popup simplicity
           const popupContent = `
             <div class="min-w-[180px] font-sans">
                  <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
@@ -655,6 +659,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           markersRef.current[zone.id] = marker;
       }
     });
+
+    // 3. Only add the polygon layer for the SELECTED zone to the map
+    if (selectedZoneId && polygonLayersRef.current[selectedZoneId]) {
+        polygonLayersRef.current[selectedZoneId].addTo(map);
+    }
+
   }, [zones, selectedZoneId, onZoneSelect, isSelectionMode]);
 
   return (
