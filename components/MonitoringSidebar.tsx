@@ -176,6 +176,7 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
 
       {/* Toggle Button */}
       <button 
+        type="button"
         onClick={() => setCollapsed(!collapsed)}
         className="absolute top-1/2 -translate-y-1/2 left-full z-30 h-12 w-6 rounded-r-lg border-y border-r border-gray-200 bg-white shadow-sm flex items-center justify-center text-gray-400 hover:text-primary hover:bg-gray-50 transition-all cursor-pointer focus:outline-none"
         title={collapsed ? "Mở rộng" : "Thu gọn"}

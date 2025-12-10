@@ -94,6 +94,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
         </div>
         <nav className="hidden md:flex items-center gap-2">
           <button 
+            type="button"
             onClick={() => onViewChange('monitoring')}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${isMonitoring ? 'bg-white text-primary shadow-sm ring-1 ring-black/5' : 'text-text-secondary hover:bg-gray-100'}`}
           >
@@ -104,6 +105,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
           {/* Only show Analysis tab if Logged In */}
           {isLoggedIn && (
             <button 
+                type="button"
                 onClick={() => onViewChange('analysis')}
                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${!isMonitoring ? 'bg-primary-light text-primary ring-1 ring-primary/20' : 'text-text-secondary hover:bg-white/60'}`}
             >
@@ -160,6 +162,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
             {/* Timeframe Selector */}
             <div className="relative group hidden xl:block" ref={timeRef}>
               <button 
+                type="button"
                 onClick={() => setShowTimeDropdown(!showTimeDropdown)}
                 className="flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 hover:bg-gray-50 transition-colors shadow-sm min-w-[140px]"
               >
@@ -196,7 +199,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
 
             {/* Notifications - Only for logged in users */}
             {isLoggedIn && (
-                <button className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 shadow-sm relative">
+                <button type="button" className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 shadow-sm relative">
                 <span className="material-symbols-outlined text-gray-600 !text-[22px]">notifications</span>
                 <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                 </button>
@@ -227,6 +230,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
              </>
           ) : (
             <button 
+                type="button"
                 onClick={onLoginToggle}
                 className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors"
             >

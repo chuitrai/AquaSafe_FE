@@ -53,23 +53,23 @@ export const AnalysisDashboard = () => {
           <h1 className="text-xl font-bold text-text-primary">Phân Tích Dữ Liệu Ngập Lụt</h1>
           
           <div className="flex items-center gap-3">
-            <button className="flex h-9 items-center justify-center gap-x-2 rounded-md border border-border-color bg-white px-3 text-sm font-medium text-text-secondary hover:bg-gray-50 transition-colors shadow-sm">
+            <button type="button" className="flex h-9 items-center justify-center gap-x-2 rounded-md border border-border-color bg-white px-3 text-sm font-medium text-text-secondary hover:bg-gray-50 transition-colors shadow-sm">
               <span className="material-symbols-outlined !text-[20px]">calendar_today</span>
               <span>Last 30 days</span>
               <span className="material-symbols-outlined !text-[20px]">arrow_drop_down</span>
             </button>
             
-            <button className="flex h-9 items-center justify-center gap-x-2 rounded-md border border-border-color bg-white px-3 text-sm font-medium text-text-secondary hover:bg-gray-50 transition-colors shadow-sm">
+            <button type="button" className="flex h-9 items-center justify-center gap-x-2 rounded-md border border-border-color bg-white px-3 text-sm font-medium text-text-secondary hover:bg-gray-50 transition-colors shadow-sm">
               <span className="material-symbols-outlined !text-[20px]">filter_list</span>
               <span>Bộ lọc nâng cao</span>
             </button>
             
-            <button className="flex h-9 items-center justify-center gap-x-2 rounded-md bg-primary text-white px-4 text-sm font-bold hover:bg-primary-dark transition-colors shadow-sm">
+            <button type="button" className="flex h-9 items-center justify-center gap-x-2 rounded-md bg-primary text-white px-4 text-sm font-bold hover:bg-primary-dark transition-colors shadow-sm">
               <span className="material-symbols-outlined !text-[20px]">download</span>
               <span className="truncate">Xuất Báo cáo</span>
             </button>
             
-            <button className="flex h-9 w-9 items-center justify-center rounded-md border border-border-color bg-white text-text-secondary hover:bg-gray-50 shadow-sm" title="Thời tiết">
+            <button type="button" className="flex h-9 w-9 items-center justify-center rounded-md border border-border-color bg-white text-text-secondary hover:bg-gray-50 shadow-sm" title="Thời tiết">
               <span className="material-symbols-outlined !text-[20px]">thermostat</span>
             </button>
           </div>

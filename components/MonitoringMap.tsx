@@ -70,6 +70,19 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   const [isPointSelectionMode, setIsPointSelectionMode] = useState(false);
   const [pointSelectionData, setPointSelectionData] = useState(null);
 
+  // Refs to track state inside event listeners without re-binding
+  const isSelectionModeRef = useRef(isSelectionMode);
+  const isPointSelectionModeRef = useRef(isPointSelectionMode);
+
+  // Sync refs with state
+  useEffect(() => {
+    isSelectionModeRef.current = isSelectionMode;
+  }, [isSelectionMode]);
+
+  useEffect(() => {
+    isPointSelectionModeRef.current = isPointSelectionMode;
+  }, [isPointSelectionMode]);
+
   // Helper to get headers
   const getAuthHeaders = () => {
       const headers = { 'Content-Type': 'application/json' };
@@ -124,6 +137,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   };
 
   // Initialize Map - Center on Hue
+  // Dependency array is empty [] to run only once
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
@@ -148,8 +162,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
     // Click handler for deselection
     map.on('click', (e) => {
-        // If we are in drawing mode, do nothing (handled by other listeners)
-        if (isSelectionMode || isPointSelectionMode) return;
+        // Use Refs to check current mode state inside the listener
+        if (isSelectionModeRef.current || isPointSelectionModeRef.current) return;
 
         // Deselect Zone
         onZoneSelect(null);
@@ -178,7 +192,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         abortControllerRef.current.abort();
       }
     };
-  }, [isSelectionMode, isPointSelectionMode]); // Re-bind if modes change, but actually internal refs handle it. simplified deps.
+  }, []); 
 
   // Polling Flood Depth Status & Update Zones
   useEffect(() => {
@@ -752,7 +766,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           
           const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
           marker.on('click', (e) => {
-            if (isSelectionMode || isPointSelectionMode) return;
+            // Check refs instead of state
+            if (isSelectionModeRef.current || isPointSelectionModeRef.current) return;
             L.DomEvent.stopPropagation(e);
             onZoneSelect(zone.id);
           });
@@ -785,7 +800,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         polygonLayersRef.current[selectedZoneId].addTo(map);
     }
 
-  }, [zones, selectedZoneId, onZoneSelect, isSelectionMode]);
+  }, [zones, selectedZoneId, onZoneSelect]); // Removed isSelectionMode from deps to prevent re-render
 
   return (
     <div className="absolute inset-0 w-full h-full bg-gray-200">
@@ -812,6 +827,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 <span className="material-symbols-outlined text-primary">area_chart</span>
                 <span className="font-bold text-gray-800 text-sm">Kết Quả Phân Tích Vùng</span>
                 <button 
+                  type="button"
                   onClick={() => {
                     setSelectionCoords(null);
                     if(selectionRectRef.current) {
@@ -838,11 +854,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         <div className="absolute right-4 top-4 flex flex-col items-end gap-2 z-[1000]">
             <div className="flex flex-col rounded-xl bg-white/90 shadow-lg backdrop-blur-sm ring-1 ring-black/5 overflow-hidden">
                 <button 
+                  type="button"
                   onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.zoomIn(); }} 
                   className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 border-b border-gray-100 transition-colors">
                     <span className="material-symbols-outlined text-gray-700 !text-[20px]">add</span>
                 </button>
                 <button 
+                  type="button"
                   onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.zoomOut(); }} 
                   className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 transition-colors">
                     <span className="material-symbols-outlined text-gray-700 !text-[20px]">remove</span>
@@ -850,6 +868,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             </div>
 
             <button 
+                type="button"
                 onClick={() => {
                     setIsSelectionMode(!isSelectionMode);
                     setIsPointSelectionMode(false);
@@ -869,6 +888,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             </button>
             
             <button 
+               type="button"
                onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.setView([16.4637, 107.5909], 12); }}
                className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-100 ring-1 ring-black/5 transition-colors mt-2">
                 <span className="material-symbols-outlined text-gray-700 !text-[20px]">my_location</span>
