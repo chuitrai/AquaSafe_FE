@@ -3,20 +3,12 @@ import { MonitoringSidebar } from './MonitoringSidebar';
 import { MonitoringMap } from './MonitoringMap';
 import { MonitoringStats } from './MonitoringStats';
 
-const initialZones = [
-  { id: 1, x: 55, y: 40, severity: 'critical', location: 'Nguyễn Hữu Cảnh', district: 'Bình Thạnh', level: 1.5, updated: '5p trước', status: 'rising' },
-  { id: 2, x: 62, y: 65, severity: 'high', location: 'Trần Xuân Soạn', district: 'Quận 7', level: 1.1, updated: '15p trước', status: 'stable' },
-  { id: 3, x: 70, y: 35, severity: 'high', location: 'Thảo Điền', district: 'Quận 2', level: 0.9, updated: '10p trước', status: 'rising' },
-  { id: 4, x: 30, y: 55, severity: 'medium', location: 'Quốc Lộ 50', district: 'Bình Chánh', level: 0.6, updated: '30p trước', status: 'falling' },
-  { id: 5, x: 80, y: 25, severity: 'medium', location: 'Đường số 10', district: 'TP. Thủ Đức', level: 0.4, updated: '1h trước', status: 'falling' },
-];
-
 export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [currentStats, setCurrentStats] = useState(null);
+  const [criticalZones, setCriticalZones] = useState([]);
   
   // State for map layers
-  // Default: Hide operational layers for guests, Show them for logged-in users
   const [activeLayers, setActiveLayers] = useState([]);
 
   useEffect(() => {
@@ -24,7 +16,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
         setActiveLayers(['Đội cứu hộ', 'Điểm cứu trợ']);
     } else {
         setActiveLayers([]);
-        setSelectedZoneId(null); // Clear selection when logged out
+        setSelectedZoneId(null); 
     }
   }, [isLoggedIn]);
 
@@ -36,10 +28,19 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
     );
   };
 
+  const handleCriticalZonesUpdate = (newZones) => {
+      // Merge new zones or replace based on logic. Here we replace/update based on ID
+      setCriticalZones(prev => {
+          const map = new Map(prev.map(z => [z.id, z]));
+          newZones.forEach(z => map.set(z.id, z));
+          return Array.from(map.values()).sort((a, b) => parseFloat(b.level) - parseFloat(a.level));
+      });
+  };
+
   return (
     <div className="flex flex-1 overflow-hidden">
       <MonitoringSidebar 
-        zones={initialZones} 
+        zones={criticalZones} 
         selectedZoneId={selectedZoneId} 
         onZoneSelect={setSelectedZoneId}
         activeLayers={activeLayers}
@@ -51,10 +52,11 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn }) =
         <div className="relative flex-1 w-full h-full flex flex-col">
             <div className="flex-1 relative min-h-0">
                 <MonitoringMap 
-                    zones={isLoggedIn ? initialZones : []} 
+                    zones={criticalZones} 
                     selectedZoneId={selectedZoneId} 
                     onZoneSelect={setSelectedZoneId}
                     onStatsUpdate={setCurrentStats}
+                    onCriticalZonesUpdate={handleCriticalZonesUpdate}
                     searchLocation={searchLocation}
                     timeFrame={timeFrame}
                     activeLayers={activeLayers}
