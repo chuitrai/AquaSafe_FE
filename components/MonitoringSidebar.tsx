@@ -106,7 +106,9 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
                                 <p className="text-xs text-gray-500 font-medium">{zone.district}</p>
                             </div>
                             <div className={`flex flex-col items-end shrink-0 ${
-                                zone.severity === 'critical' ? 'text-red-600' : zone.severity === 'high' ? 'text-orange-600' : 'text-blue-600'
+                                zone.severity === 'critical' ? 'text-[#dc2626]' : 
+                                zone.severity === 'high' ? 'text-[#f97316]' : 
+                                zone.severity === 'medium' ? 'text-[#eab308]' : 'text-[#3b82f6]'
                             }`}>
                                 <span className="font-bold text-lg leading-none">{zone.level}m</span>
                             </div>
@@ -154,15 +156,15 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
                  <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6] ring-1 ring-white shadow-sm"></span>
-                    <span className="text-xs text-gray-600">Nhẹ (&lt;0.5m)</span>
+                    <span className="text-xs text-gray-600">Nhẹ (&lt;0.2m)</span>
                  </div>
                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#facc15] ring-1 ring-white shadow-sm"></span>
-                    <span className="text-xs text-gray-600">Trung bình</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#eab308] ring-1 ring-white shadow-sm"></span>
+                    <span className="text-xs text-gray-600">Trung bình (0.2-0.5m)</span>
                  </div>
                  <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#f97316] ring-1 ring-white shadow-sm"></span>
-                    <span className="text-xs text-gray-600">Cao (&gt;0.5m)</span>
+                    <span className="text-xs text-gray-600">Cao (0.5-1m)</span>
                  </div>
                  <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] ring-1 ring-white shadow-sm"></span>

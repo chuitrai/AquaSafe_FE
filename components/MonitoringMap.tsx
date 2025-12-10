@@ -130,9 +130,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     
                     // Determine Severity
                     let severity = 'low';
-                    if (newDepthMm > 1000) severity = 'critical';
-                    else if (newDepthMm > 500) severity = 'high';
-                    else if (newDepthMm > 200) severity = 'medium';
+                    if (newDepthMm > 1000) severity = 'critical'; // > 1m
+                    else if (newDepthMm > 500) severity = 'high'; // > 0.5m
+                    else if (newDepthMm > 200) severity = 'medium'; // > 0.2m
 
                     // Check if this zone is already being tracked
                     const existingZone = zones.find(z => z.id === id);
@@ -565,15 +565,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     
     // Clear existing polygons from map
     Object.values(polygonLayersRef.current).forEach((layer: any) => layer.remove());
-    // Note: We don't necessarily clear the REF object here, we re-populate it. 
-    // Actually, safer to clear ref so we don't have stale layers.
     polygonLayersRef.current = {};
 
     zones.forEach(zone => {
       // 1. Prepare Boundary Polygon if rawData is available (BUT DO NOT ADD TO MAP YET)
       if (zone.rawData && zone.rawData.members) {
          // Determine color based on severity
-         let color = '#3b82f6'; // blue
+         let color = '#3b82f6'; // blue (Low)
          if (zone.severity === 'critical') color = '#dc2626'; // red
          else if (zone.severity === 'high') color = '#f97316'; // orange
          else if (zone.severity === 'medium') color = '#eab308'; // yellow
@@ -606,11 +604,11 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       }
 
       if (lat && lng) {
-          let colorClass = 'bg-blue-500';
-          let ringClass = 'ring-blue-500';
-          if (zone.severity === 'critical') { colorClass = 'bg-red-600'; ringClass = 'ring-red-600'; }
-          else if (zone.severity === 'high') { colorClass = 'bg-orange-500'; ringClass = 'ring-orange-500'; }
-          else if (zone.severity === 'medium') { colorClass = 'bg-yellow-500'; ringClass = 'ring-yellow-500'; }
+          let colorClass = 'bg-[#3b82f6]'; // blue
+          let ringClass = 'ring-[#3b82f6]'; 
+          if (zone.severity === 'critical') { colorClass = 'bg-[#dc2626]'; ringClass = 'ring-[#dc2626]'; }
+          else if (zone.severity === 'high') { colorClass = 'bg-[#f97316]'; ringClass = 'ring-[#f97316]'; }
+          else if (zone.severity === 'medium') { colorClass = 'bg-[#eab308]'; ringClass = 'ring-[#eab308]'; }
 
           const isSelected = selectedZoneId === zone.id;
           const size = isSelected ? 'w-6 h-6' : 'w-4 h-4';
@@ -641,9 +639,9 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             <div class="min-w-[180px] font-sans">
                  <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
                     <span class="font-bold px-2 py-0.5 rounded text-[10px] uppercase text-white ${
-                        zone.severity === 'critical' ? 'bg-red-500' :
-                        zone.severity === 'high' ? 'bg-orange-500' :
-                        zone.severity === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
+                        zone.severity === 'critical' ? 'bg-[#dc2626]' :
+                        zone.severity === 'high' ? 'bg-[#f97316]' :
+                        zone.severity === 'medium' ? 'bg-[#eab308]' : 'bg-[#3b82f6]'
                     }">Cảnh báo</span>
                 </div>
                 <p class="font-bold text-gray-800 text-sm mb-0.5">${zone.location}</p>
