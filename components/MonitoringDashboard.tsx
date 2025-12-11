@@ -71,7 +71,6 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
         activeLayers={activeLayers}
         onToggleLayer={toggleLayer}
         isLoggedIn={isLoggedIn}
-        onOpenAlertModal={(zone) => setAlertModalData({ isOpen: true, zone })}
       />
       
       <main className="relative flex flex-1 flex-col bg-gray-100 peer-focus-within:opacity-50 transition-opacity duration-300">
@@ -88,6 +87,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
                     activeLayers={activeLayers}
                     isLoggedIn={isLoggedIn}
                     token={token}
+                    onOpenAlertModal={(zone) => setAlertModalData({ isOpen: true, zone })}
                 />
             </div>
             {/* Only show Stats if User is Logged In */}
@@ -105,7 +105,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
             isOpen={alertModalData.isOpen} 
             onClose={() => setAlertModalData({ ...alertModalData, isOpen: false })}
             zone={alertModalData.zone}
-            senderName="Nguyễn Văn A" 
+            senderName="Huế's AquaSafe Admin" 
           />
       )}
     </div>
