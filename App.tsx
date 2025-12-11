@@ -10,6 +10,7 @@ const App = () => {
   
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [token, setToken] = useState(null);
   
   // State to hold the coordinates selected from the search bar
   const [searchLocation, setSearchLocation] = useState(null);
@@ -25,8 +26,11 @@ const App = () => {
 
   const handleLoginToggle = () => {
     if (isLoggedIn) {
-      // Logout logic
+      // Logout logic: Reset ALL states
       setIsLoggedIn(false);
+      setToken(null);
+      setSearchLocation(null);
+      setTimeFrame({ id: 'now', label: 'Hiện tại' });
       setCurrentView('monitoring');
     } else {
       // Go to Login Page
@@ -34,13 +38,29 @@ const App = () => {
     }
   };
 
-  const handleLoginSubmit = (username, password, callback) => {
-      // Hardcoded Mockup Credentials
-      if (username === 'admin_hcm' && password === 'password_hcm') {
-          setIsLoggedIn(true);
-          setCurrentView('analysis'); // Redirect to analysis dashboard on success
-          callback(true);
-      } else {
+  const handleLoginSubmit = async (username, password, callback) => {
+      try {
+          const response = await fetch('http://localhost:8220/api/auth/login', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ username, password }),
+          });
+
+          if (response.ok) {
+              const data = await response.json();
+              // Store token
+              setToken(data.token);
+              
+              setIsLoggedIn(true);
+              setCurrentView('analysis'); // Redirect to analysis dashboard on success
+              callback(true);
+          } else {
+              callback(false);
+          }
+      } catch (error) {
+          console.error("Login API error:", error);
           callback(false);
       }
   };
@@ -75,6 +95,7 @@ const App = () => {
                 searchLocation={searchLocation} 
                 timeFrame={timeFrame}
                 isLoggedIn={isLoggedIn}
+                token={token}
             />
         )}
       </main>

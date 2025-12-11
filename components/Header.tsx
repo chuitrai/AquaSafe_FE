@@ -8,6 +8,41 @@ const TIME_OPTIONS = [
     { id: 'future-60', label: '1 giờ tới' },
 ];
 
+const MOCK_NOTIFICATIONS = [
+    {
+        id: 1,
+        type: 'critical', // xả lũ
+        title: 'Cảnh báo Xả lũ: Hồ Tả Trạch',
+        message: 'Lưu lượng xả sẽ tăng lên 600m³/s bắt đầu từ 15:30 chiều nay. Yêu cầu di dời vùng hạ du.',
+        time: '5 phút trước',
+        isRead: false,
+    },
+    {
+        id: 2,
+        type: 'emergency', // cứu trợ khẩn cấp
+        title: 'Cần hỗ trợ: Phường Phú Xuân',
+        message: 'Khu vực tổ 6 ngập sâu >1.2m, 3 hộ dân mắc kẹt. Cần ca nô hỗ trợ khẩn cấp.',
+        time: '12 phút trước',
+        isRead: false,
+    },
+    {
+        id: 3,
+        type: 'warning',
+        title: 'Cảnh báo mưa lớn diện rộng',
+        message: 'Đài khí tượng thủy văn dự báo lượng mưa đạt 150mm trong 3 giờ tới.',
+        time: '45 phút trước',
+        isRead: true,
+    },
+    {
+        id: 4,
+        type: 'info',
+        title: 'Chỉ đạo từ Ban Chỉ Huy PCTT',
+        message: 'Yêu cầu các đơn vị duy trì trực ban 24/24, báo cáo số liệu mỗi 30 phút.',
+        time: '1 giờ trước',
+        isRead: true,
+    }
+];
+
 export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange, isLoggedIn, onLoginToggle }) => {
   const isMonitoring = currentView === 'monitoring';
   
@@ -21,6 +56,11 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
   // Timeframe Dropdown State
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const timeRef = useRef(null);
+
+  // Notification State
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const notificationRef = useRef(null);
 
   // Debounce search
   useEffect(() => {
@@ -58,6 +98,9 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
       if (timeRef.current && !timeRef.current.contains(event.target)) {
         setShowTimeDropdown(false);
       }
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -85,6 +128,12 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
     setShowTimeDropdown(false);
   };
 
+  const markAllAsRead = () => {
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  };
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
   return (
     <header className={`flex w-full items-center justify-between gap-4 px-6 py-3 shadow-sm shrink-0 z-20 border-b transition-colors duration-300 ${isMonitoring ? 'bg-blue-50 border-blue-200 h-16' : 'bg-white border-border-color'}`}>
       <div className="flex items-center gap-8">
@@ -94,6 +143,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
         </div>
         <nav className="hidden md:flex items-center gap-2">
           <button 
+            type="button"
             onClick={() => onViewChange('monitoring')}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${isMonitoring ? 'bg-white text-primary shadow-sm ring-1 ring-black/5' : 'text-text-secondary hover:bg-gray-100'}`}
           >
@@ -104,6 +154,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
           {/* Only show Analysis tab if Logged In */}
           {isLoggedIn && (
             <button 
+                type="button"
                 onClick={() => onViewChange('analysis')}
                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${!isMonitoring ? 'bg-primary-light text-primary ring-1 ring-primary/20' : 'text-text-secondary hover:bg-white/60'}`}
             >
@@ -122,7 +173,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 !text-[20px]">search</span>
               <input 
                 className="h-10 w-full rounded-lg border-gray-300 bg-white pl-10 pr-10 text-sm text-gray-800 placeholder:text-gray-500 focus:border-primary focus:ring-primary shadow-sm border outline-none transition-all" 
-                placeholder="Tìm kiếm địa chỉ, phường (TP.HCM)..." 
+                placeholder="Tìm kiếm địa chỉ, phường..." 
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -160,6 +211,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
             {/* Timeframe Selector */}
             <div className="relative group hidden xl:block" ref={timeRef}>
               <button 
+                type="button"
                 onClick={() => setShowTimeDropdown(!showTimeDropdown)}
                 className="flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 hover:bg-gray-50 transition-colors shadow-sm min-w-[140px]"
               >
@@ -196,10 +248,77 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
 
             {/* Notifications - Only for logged in users */}
             {isLoggedIn && (
-                <button className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 shadow-sm relative">
-                <span className="material-symbols-outlined text-gray-600 !text-[22px]">notifications</span>
-                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                </button>
+                <div className="relative" ref={notificationRef}>
+                    <button 
+                        type="button" 
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all ${showNotifications ? 'bg-blue-50 border-blue-200 text-primary' : 'border-gray-200 bg-white hover:bg-gray-100 text-gray-600'} shadow-sm relative`}
+                    >
+                        <span className="material-symbols-outlined !text-[22px]">notifications</span>
+                        {unreadCount > 0 && (
+                            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white animate-pulse"></span>
+                        )}
+                    </button>
+
+                    {/* Notifications Dropdown */}
+                    {showNotifications && (
+                        <div className="absolute top-12 right-0 w-80 md:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="px-4 py-3 bg-white border-b border-gray-100 flex justify-between items-center">
+                                <h3 className="font-bold text-gray-800 text-sm">Thông báo</h3>
+                                {unreadCount > 0 && (
+                                    <button 
+                                        onClick={markAllAsRead}
+                                        className="text-xs text-primary font-medium hover:underline"
+                                    >
+                                        Đánh dấu đã đọc
+                                    </button>
+                                )}
+                            </div>
+                            <div className="max-h-[320px] overflow-y-auto scrollbar-thin">
+                                {notifications.length > 0 ? (
+                                    notifications.map((notif) => (
+                                        <div 
+                                            key={notif.id} 
+                                            className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex gap-3 ${!notif.isRead ? 'bg-blue-50/30' : ''}`}
+                                        >
+                                            <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                                                notif.type === 'critical' ? 'bg-red-100 text-red-600' :
+                                                notif.type === 'emergency' ? 'bg-orange-100 text-orange-600' :
+                                                notif.type === 'warning' ? 'bg-yellow-100 text-yellow-600' :
+                                                'bg-blue-100 text-blue-600'
+                                            }`}>
+                                                <span className="material-symbols-outlined !text-[18px]">
+                                                    {notif.type === 'critical' ? 'flood' : 
+                                                     notif.type === 'emergency' ? 'sos' :
+                                                     notif.type === 'warning' ? 'warning' : 'info'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <div className="flex justify-between items-start mb-0.5">
+                                                    <p className={`text-sm font-bold ${!notif.isRead ? 'text-gray-900' : 'text-gray-700'}`}>
+                                                        {notif.title}
+                                                    </p>
+                                                    {!notif.isRead && <span className="w-2 h-2 bg-primary rounded-full mt-1.5"></span>}
+                                                </div>
+                                                <p className="text-xs text-gray-600 leading-relaxed mb-1.5">{notif.message}</p>
+                                                <p className="text-[10px] text-gray-400 font-medium">{notif.time}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-8 text-center text-gray-400 text-sm">
+                                        Không có thông báo mới
+                                    </div>
+                                )}
+                            </div>
+                            <div className="px-4 py-2 bg-gray-50 text-center border-t border-gray-100">
+                                <button className="text-xs font-bold text-gray-600 hover:text-primary transition-colors">
+                                    Xem tất cả
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
           </>
         )}
@@ -227,6 +346,7 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
              </>
           ) : (
             <button 
+                type="button"
                 onClick={onLoginToggle}
                 className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors"
             >
