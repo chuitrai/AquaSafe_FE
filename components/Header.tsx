@@ -10,6 +10,24 @@ const TIME_OPTIONS = [
 
 const MOCK_NOTIFICATIONS = [
     {
+        id: 99,
+        type: 'request', // New Type
+        title: 'Yêu cầu hỗ trợ: Phường Vỹ Dạ',
+        message: 'Cần điều động gấp 3 máy bơm công suất lớn để hút nước khu vực hầm chung cư.',
+        time: '2 phút trước',
+        isRead: false,
+        source: 'Chủ tịch UBND P. Vỹ Dạ'
+    },
+    {
+        id: 98,
+        type: 'request', // New Type
+        title: 'Yêu cầu vật tư: Phường Phú Hội',
+        message: 'Xin hỗ trợ 50 áo phao và 2 xuồng cao su để di dời dân ngõ 12.',
+        time: '5 phút trước',
+        isRead: false,
+        source: 'Tổ trưởng Tổ dân phố 6'
+    },
+    {
         id: 1,
         type: 'critical', // xả lũ
         title: 'Cảnh báo Xả lũ: Hồ Tả Trạch',
@@ -43,7 +61,7 @@ const MOCK_NOTIFICATIONS = [
     }
 ];
 
-export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange, isLoggedIn, onLoginToggle }) => {
+export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange, isLoggedIn, onLoginToggle, onOpenResourceResponse }) => {
   const isMonitoring = currentView === 'monitoring';
   
   // Search State
@@ -274,34 +292,54 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
                                     </button>
                                 )}
                             </div>
-                            <div className="max-h-[320px] overflow-y-auto scrollbar-thin">
+                            <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
                                 {notifications.length > 0 ? (
                                     notifications.map((notif) => (
                                         <div 
                                             key={notif.id} 
-                                            className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex gap-3 ${!notif.isRead ? 'bg-blue-50/30' : ''}`}
+                                            onClick={() => notif.type === 'request' && onOpenResourceResponse(notif)}
+                                            className={`p-4 border-b border-gray-50 transition-colors flex gap-3 relative group
+                                                ${!notif.isRead ? 'bg-blue-50/30' : ''}
+                                                ${notif.type === 'request' ? 'hover:bg-blue-50 cursor-pointer' : 'hover:bg-gray-50'}
+                                            `}
                                         >
+                                            {/* Icon */}
                                             <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                                                notif.type === 'request' ? 'bg-purple-100 text-purple-600' :
                                                 notif.type === 'critical' ? 'bg-red-100 text-red-600' :
                                                 notif.type === 'emergency' ? 'bg-orange-100 text-orange-600' :
                                                 notif.type === 'warning' ? 'bg-yellow-100 text-yellow-600' :
                                                 'bg-blue-100 text-blue-600'
                                             }`}>
                                                 <span className="material-symbols-outlined !text-[18px]">
-                                                    {notif.type === 'critical' ? 'flood' : 
+                                                    {notif.type === 'request' ? 'assignment_add' :
+                                                     notif.type === 'critical' ? 'flood' : 
                                                      notif.type === 'emergency' ? 'sos' :
                                                      notif.type === 'warning' ? 'warning' : 'info'}
                                                 </span>
                                             </div>
-                                            <div>
+
+                                            {/* Content */}
+                                            <div className="flex-1">
                                                 <div className="flex justify-between items-start mb-0.5">
                                                     <p className={`text-sm font-bold ${!notif.isRead ? 'text-gray-900' : 'text-gray-700'}`}>
                                                         {notif.title}
                                                     </p>
-                                                    {!notif.isRead && <span className="w-2 h-2 bg-primary rounded-full mt-1.5"></span>}
+                                                    {!notif.isRead && <span className="w-2 h-2 bg-primary rounded-full mt-1.5 shrink-0 ml-2"></span>}
                                                 </div>
-                                                <p className="text-xs text-gray-600 leading-relaxed mb-1.5">{notif.message}</p>
-                                                <p className="text-[10px] text-gray-400 font-medium">{notif.time}</p>
+                                                <p className="text-xs text-gray-600 leading-relaxed mb-1.5 line-clamp-2">{notif.message}</p>
+                                                
+                                                <div className="flex justify-between items-center mt-2">
+                                                    <p className="text-[10px] text-gray-400 font-medium">{notif.time}</p>
+                                                    
+                                                    {/* Request Action Button */}
+                                                    {notif.type === 'request' && (
+                                                        <span className="text-[10px] font-bold text-white bg-primary hover:bg-primary-dark px-2 py-1 rounded shadow-sm flex items-center gap-1 transition-colors">
+                                                            <span className="material-symbols-outlined !text-[12px]">reply</span>
+                                                            Phản hồi
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))
