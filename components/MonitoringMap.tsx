@@ -1,60 +1,132 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { DispatchPanel } from './DispatchPanel';
 
 // API Configuration
 const API_BASE_URL = "http://localhost:8220/api";
 
-// Helper to calculate lat/lng from x/y (0-100 relative to center)
-const getZoneLatLng = (x, y) => {
-  const centerLat = 10.762622;
-  const centerLng = 106.660172;
-  const lat = centerLat - ((y - 50) / 100) * 0.15;
-  const lng = centerLng + ((x - 50) / 100) * 0.2;
-  return [lat, lng];
+// --- MOCK DATA FOR HUE REGION ---
+const HUE_CENTER = { lat: 16.4637, lng: 107.5909 };
+
+// Helper to generate random coord around Hue
+const getRandomCoord = () => {
+    const lat = HUE_CENTER.lat + (Math.random() - 0.5) * 0.06; // +/- ~3km
+    const lng = HUE_CENTER.lng + (Math.random() - 0.5) * 0.08;
+    return [lat, lng];
 };
 
-// Mock Rescue Teams
 const MOCK_RESCUE_TEAMS = [
-    { id: 'R1', x: 52, y: 48, name: "Đội CH #01", status: "busy" },
-    { id: 'R2', x: 60, y: 38, name: "Đội CH #02", status: "idle" },
-    { id: 'R3', x: 45, y: 55, name: "Đội Y Tế #05", status: "busy" },
-    { id: 'R4', x: 65, y: 60, name: "Đội Hậu Cần", status: "idle" }
+    { id: 'RT01', name: 'Đội CH Phường Phú Hội', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT02', name: 'Cảnh sát PCCC & CNCH', type: 'truck', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT03', name: 'Tổ Phản ứng nhanh 115', type: 'ambulance', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT04', name: 'Đội TNV Chữ Thập Đỏ', type: 'medical', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT05', name: 'Ban CHQS TP Huế', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT06', name: 'Đội CH Vỹ Dạ', type: 'boat', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT07', name: 'Đội Hậu Cần Quân Khu 4', type: 'truck', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT08', name: 'Biệt đội Cano 01', type: 'boat', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT09', name: 'Y tế Phường Xuân Phú', type: 'medical', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT10', name: 'Đội CH An Cựu', type: 'boat', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT11', name: 'CSGT Đường Thủy', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT12', name: 'Đội Xe Lội Nước', type: 'truck', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT13', name: 'TNV Áo Xanh Huế', type: 'medical', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT14', name: 'Đội CH Phường Đúc', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT15', name: 'Trung tâm Cấp cứu 115 #2', type: 'ambulance', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT16', name: 'Đội CH Kim Long', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT17', name: 'Hải Đội 2 Biên Phòng', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT18', name: 'Tổ Công Tác Đặc Biệt', type: 'truck', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT19', name: 'Y Tế Lưu Động Số 3', type: 'medical', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RT20', name: 'Đội CH Thuận An', type: 'boat', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
 ];
 
-// Mock Relief Points (Shelters, Food Distribution)
 const MOCK_RELIEF_POINTS = [
-    { id: 'P1', x: 50, y: 35, name: "UBND Phường 22", type: "shelter", capacity: "150/200" },
-    { id: 'P2', x: 75, y: 45, name: "Trường THPT Thảo Điền", type: "shelter", capacity: "50/500" },
-    { id: 'P3', x: 35, y: 65, name: "Điểm phát lương thực Q7", type: "food", capacity: "Còn 500 suất" },
-    { id: 'P4', x: 58, y: 25, name: "Trạm Y Tế Phường 15", type: "medical", capacity: "Sẵn sàng" }
+    { id: 'RP01', name: 'BV Trung Ương Huế', type: 'hospital', capacity: 'Sẵn sàng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP02', name: 'Trường Quốc Học Huế', type: 'shelter', capacity: '300/500', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP03', name: 'UBND Phường Vỹ Dạ', type: 'food', capacity: 'Còn 200 suất', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP04', name: 'Nhà Văn Hóa Lao Động', type: 'shelter', capacity: '150/300', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP05', name: 'Trung tâm Y tế TP Huế', type: 'hospital', capacity: 'Quá tải nhẹ', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP06', name: 'Kho Gạo Dự Trữ', type: 'food', capacity: 'Đầy kho', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP07', name: 'Trường THPT Hai Bà Trưng', type: 'shelter', capacity: '50/400', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP08', name: 'Chùa Thiên Mụ', type: 'shelter', capacity: '100/200', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP09', name: 'BV Đại Học Y Dược', type: 'hospital', capacity: 'Sẵn sàng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP10', name: 'Siêu thị Go! (Điểm tiếp tế)', type: 'food', capacity: 'Hoạt động', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP11', name: 'UBND Phường Xuân Phú', type: 'shelter', capacity: 'Đầy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP12', name: 'Trạm Y Tế An Cựu', type: 'hospital', capacity: 'Sẵn sàng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP13', name: 'Nhà Thờ Phủ Cam', type: 'shelter', capacity: '200/600', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP14', name: 'Kho Hậu Cần QK4', type: 'food', capacity: 'Sẵn sàng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP15', name: 'Trường ĐH Khoa Học', type: 'shelter', capacity: '10/1000', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP16', name: 'BV Quốc Tế Huế', type: 'hospital', capacity: 'Sẵn sàng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP17', name: 'Điểm phát mỳ tôm Hương Sơ', type: 'food', capacity: 'Còn 50 thùng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP18', name: 'Đại Học Sư Phạm', type: 'shelter', capacity: '500/800', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP19', name: 'Trạm Y Tế Kim Long', type: 'hospital', capacity: 'Sẵn sàng', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
+    { id: 'RP20', name: 'Chợ Đông Ba (Điểm tập kết)', type: 'food', capacity: 'Đang nhập', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
 ];
 
-export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, searchLocation, timeFrame, activeLayers }) => {
+// --- CONVEX HULL ALGORITHM (Monotone Chain) ---
+const getConvexHull = (points) => {
+    if (points.length < 3) return points;
+
+    const sortedPoints = [...points].sort((a, b) => {
+        return a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon;
+    });
+
+    const crossProduct = (o, a, b) => {
+        return (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
+    };
+
+    const lower = [];
+    for (const point of sortedPoints) {
+        while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+            lower.pop();
+        }
+        lower.push(point);
+    }
+
+    const upper = [];
+    for (let i = sortedPoints.length - 1; i >= 0; i--) {
+        const point = sortedPoints[i];
+        while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+            upper.pop();
+        }
+        upper.push(point);
+    }
+
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
+};
+
+export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, onCriticalZonesUpdate, searchLocation, timeFrame, activeLayers, isLoggedIn, token }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
-  const rescueMarkersRef = useRef([]); // Store rescue team markers
-  const reliefMarkersRef = useRef([]); // Store relief point markers
+  const polygonLayersRef = useRef({}); 
   
+  // New Refs for Rescue & Relief
+  const rescueMarkersRef = useRef([]);
+  const reliefMarkersRef = useRef([]);
+
   // Selection Area Refs
-  const selectionRectRef = useRef(null); // Ref for the rectangle layer
-  const borderLayersRef = useRef([]); // Ref to store drawn API border layers (Rectangle mode)
+  const selectionRectRef = useRef(null);
+  const borderLayersRef = useRef([]); 
   
   // Point Selection Refs
-  const pointSelectionLayerRef = useRef(L.layerGroup()); // Ref to store point marker and polygon
+  const pointSelectionLayerRef = useRef(L.layerGroup()); 
   
-  const abortControllerRef = useRef(null); // Ref to manage API cancellation
-  const searchMarkerRef = useRef(null); // Ref specifically for the search result pin
+  const abortControllerRef = useRef(null);
+  const searchMarkerRef = useRef(null);
 
   const [isLoadingBorders, setIsLoadingBorders] = useState(false);
   
   // Heatmap State
   const [isLoadingHeatmap, setIsLoadingHeatmap] = useState(false);
   const [heatmapData, setHeatmapData] = useState(null);
-  const [heatmapError, setHeatmapError] = useState(null);
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [heatmapOpacity, setHeatmapOpacity] = useState(0.7);
   const heatmapOverlayRef = useRef(null);
+  
+  // Real-time Flood Status & Population Cache
+  const floodStatusRef = useRef({});
+  const populationCacheRef = useRef({}); // Cache population data to avoid re-fetching
   
   // Rectangle Selection Tool State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -66,40 +138,122 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   const [isPointSelectionMode, setIsPointSelectionMode] = useState(false);
   const [pointSelectionData, setPointSelectionData] = useState(null);
 
-  // Initialize Map
+  // Dispatch Panel State
+  const [isDispatchOpen, setIsDispatchOpen] = useState(false);
+
+  // Refs to track state inside event listeners without re-binding
+  const isSelectionModeRef = useRef(isSelectionMode);
+  const isPointSelectionModeRef = useRef(isPointSelectionMode);
+
+  // Sync refs with state
+  useEffect(() => {
+    isSelectionModeRef.current = isSelectionMode;
+  }, [isSelectionMode]);
+
+  useEffect(() => {
+    isPointSelectionModeRef.current = isPointSelectionMode;
+  }, [isPointSelectionMode]);
+
+  // Helper to get headers
+  const getAuthHeaders = () => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+      }
+      return headers;
+  };
+
+  // Helper to calculate and set global stats based on all available data
+  const calculateAndSetGlobalStats = () => {
+      if (!onStatsUpdate) return;
+
+      const statusMap = floodStatusRef.current;
+      const popMap = populationCacheRef.current;
+      
+      const ids = Object.keys(statusMap);
+      if (ids.length === 0) {
+          onStatsUpdate(null);
+          return;
+      }
+
+      let totalDepthMm = 0;
+      let totalPopulation = 0;
+      let validDepthCount = 0;
+
+      ids.forEach(id => {
+          const depth = statusMap[id] || 0;
+          totalDepthMm += depth;
+          validDepthCount++;
+          
+          if (popMap[id]) {
+              totalPopulation += popMap[id];
+          }
+      });
+
+      const avgFloodDepthMm = validDepthCount > 0 ? totalDepthMm / validDepthCount : 0;
+      
+      if (totalPopulation === 0 && validDepthCount > 0) {
+          totalPopulation = validDepthCount * 5000; 
+      }
+
+      onStatsUpdate({
+          population: totalPopulation,
+          avgFloodLevel: (avgFloodDepthMm / 1000).toFixed(2),
+          food: (totalPopulation * 0.05 / 1000).toFixed(1),
+          workers: Math.floor(totalPopulation / 1000) + 20
+      });
+  };
+
+  // Initialize Map - Center on Hue
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // 1. Create Map Instance centered on Ho Chi Minh City
+    // Hue City Coordinates
     const map = L.map(mapContainerRef.current, {
-      zoomControl: false, // We use custom buttons
+      zoomControl: false,
       attributionControl: false
-    }).setView([10.762622, 106.660172], 12);
+    }).setView([16.4637, 107.5909], 12); 
 
     mapInstanceRef.current = map;
 
-    // 2. Add OpenStreetMap Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
     }).addTo(map);
 
-    // 3. Add Attribution (Clean look)
     L.control.attribution({
       position: 'bottomright',
       prefix: 'OSM'
     }).addTo(map);
 
-    // 4. Add Layer Group for Point Selection
     pointSelectionLayerRef.current.addTo(map);
 
-    // 5. Wait for map to be fully ready before loading heatmap
+    // Load flood heatmap when map is ready
     map.whenReady(() => {
         if (!heatmapData) {
             loadFloodHeatmap(map);
         }
     });
 
-    // Cleanup
+    // Click handler for deselection
+    map.on('click', (e) => {
+        if (isSelectionModeRef.current || isPointSelectionModeRef.current) return;
+
+        onZoneSelect(null);
+
+        setSelectionCoords(null);
+        if (selectionRectRef.current) {
+            selectionRectRef.current.remove();
+            selectionRectRef.current = null;
+        }
+        borderLayersRef.current.forEach(layer => layer.remove());
+        borderLayersRef.current = [];
+
+        setPointSelectionData(null);
+        pointSelectionLayerRef.current.clearLayers();
+
+        calculateAndSetGlobalStats();
+    });
+
     return () => {
       map.remove();
       mapInstanceRef.current = null;
@@ -107,133 +261,284 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, []); 
 
-  // Handle FlyTo Zone when selectedZoneId changes
+  // --- NEW EFFECT: Handle Rescue & Relief Layers ---
+  useEffect(() => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+
+      // 1. Clear existing layer markers
+      rescueMarkersRef.current.forEach(m => m.remove());
+      rescueMarkersRef.current = [];
+      
+      reliefMarkersRef.current.forEach(m => m.remove());
+      reliefMarkersRef.current = [];
+
+      // 2. Render Rescue Teams if Active
+      if (activeLayers && activeLayers.includes('Đội cứu hộ')) {
+          MOCK_RESCUE_TEAMS.forEach(team => {
+              let iconName = 'groups';
+              if (team.type === 'boat') iconName = 'sailing';
+              if (team.type === 'truck') iconName = 'local_shipping';
+              if (team.type === 'ambulance') iconName = 'ambulance';
+              if (team.type === 'medical') iconName = 'medical_services';
+
+              const colorClass = team.status === 'busy' ? 'bg-red-500 border-red-600' : 'bg-blue-600 border-blue-700';
+
+              const iconHtml = `
+                <div class="relative flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-full shadow-lg border-2 border-white ${colorClass} flex items-center justify-center text-white">
+                        <span class="material-symbols-outlined !text-[18px]">${iconName}</span>
+                    </div>
+                    ${team.status === 'busy' ? '<div class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>' : ''}
+                </div>
+              `;
+              
+              const icon = L.divIcon({
+                  html: iconHtml,
+                  className: 'custom-div-icon',
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 16]
+              });
+
+              const marker = L.marker([team.lat, team.lng], { icon }).addTo(map);
+              const popupContent = `
+                <div class="min-w-[150px]">
+                    <div class="flex items-center gap-2 mb-1">
+                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-white ${team.status === 'busy' ? 'bg-red-500' : 'bg-blue-600'}">
+                            ${team.status === 'busy' ? 'Đang bận' : 'Sẵn sàng'}
+                         </span>
+                    </div>
+                    <h4 class="font-bold text-gray-800 text-sm">${team.name}</h4>
+                    <p class="text-xs text-gray-500 italic">ID: ${team.id}</p>
+                </div>
+              `;
+              marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup', offset: [0, -10] });
+              rescueMarkersRef.current.push(marker);
+          });
+      }
+
+      // 3. Render Relief Points if Active
+      if (activeLayers && activeLayers.includes('Điểm cứu trợ')) {
+          MOCK_RELIEF_POINTS.forEach(point => {
+              let iconName = 'home';
+              let bgClass = 'bg-green-600';
+              if (point.type === 'hospital') { iconName = 'local_hospital'; bgClass = 'bg-red-500'; }
+              if (point.type === 'food') { iconName = 'inventory_2'; bgClass = 'bg-orange-500'; }
+              if (point.type === 'shelter') { iconName = 'roofing'; bgClass = 'bg-green-600'; }
+
+              const iconHtml = `
+                <div class="relative flex items-center justify-center">
+                     <div class="w-8 h-8 rounded-lg shadow-md border-2 border-white ${bgClass} flex items-center justify-center text-white transform rotate-45">
+                        <span class="material-symbols-outlined !text-[18px] -rotate-45">${iconName}</span>
+                    </div>
+                </div>
+              `;
+              
+              const icon = L.divIcon({
+                  html: iconHtml,
+                  className: 'custom-div-icon',
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 16]
+              });
+
+              const marker = L.marker([point.lat, point.lng], { icon }).addTo(map);
+              const popupContent = `
+                <div class="min-w-[160px]">
+                    <div class="flex items-center gap-1 mb-1">
+                        <span class="material-symbols-outlined !text-[14px] text-gray-500">${iconName}</span>
+                        <span class="text-[10px] font-bold uppercase text-gray-500">
+                            ${point.type === 'hospital' ? 'Y tế' : point.type === 'food' ? 'Lương thực' : 'Trú ẩn'}
+                        </span>
+                    </div>
+                    <h4 class="font-bold text-gray-800 text-sm mb-0.5">${point.name}</h4>
+                    <div class="bg-gray-50 p-1.5 rounded border border-gray-100 mt-1">
+                        <p class="text-[10px] text-gray-500">Trạng thái/Sức chứa:</p>
+                        <p class="text-xs font-bold text-gray-800">${point.capacity}</p>
+                    </div>
+                </div>
+              `;
+              marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup', offset: [0, -12] });
+              reliefMarkersRef.current.push(marker);
+          });
+      }
+
+  }, [activeLayers]); // Re-run when activeLayers changes
+
+  // Polling Flood Depth Status & Update Zones
+  useEffect(() => {
+    const fetchFloodStatus = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/flood-depth-status`, {
+                headers: getAuthHeaders()
+            });
+            const json = await res.json();
+            
+            if (json.success && Array.isArray(json.data)) {
+                const updates = [];
+                const idsToFetch = [];
+                
+                json.data.forEach(item => {
+                    const id = item.id;
+                    const newDepthMm = item.depth || 0;
+                    const oldDepthMm = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepthMm;
+                    
+                    // Update Flood Status Ref
+                    floodStatusRef.current[id] = newDepthMm;
+
+                    // If we don't have population data for this ID, mark it for fetching
+                    if (populationCacheRef.current[id] === undefined) {
+                        idsToFetch.push({ id, depthMm: newDepthMm });
+                    }
+
+                    // Logic to detect changes for Critical Zones
+                    const isRising = newDepthMm > oldDepthMm;
+                    const isFalling = newDepthMm < oldDepthMm;
+                    
+                    // Determine Severity
+                    let severity = 'low';
+                    if (newDepthMm > 1000) severity = 'critical'; // > 1m
+                    else if (newDepthMm > 500) severity = 'high'; // > 0.5m
+                    else if (newDepthMm > 200) severity = 'medium'; // > 0.2m
+
+                    // Check if this zone is already being tracked
+                    const existingZone = zones.find(z => z.id === id);
+
+                    if (existingZone) {
+                        // Only update if there is a change in depth or status
+                        if (isRising || isFalling || existingZone.level !== (newDepthMm / 1000).toFixed(1)) {
+                            updates.push({
+                                ...existingZone,
+                                level: (newDepthMm / 1000).toFixed(1),
+                                severity: severity,
+                                status: isRising ? 'rising' : (isFalling ? 'falling' : 'stable'),
+                                timestamp: Date.now() 
+                            });
+                        }
+                    } else if (newDepthMm > 200) {
+                        // New potential zone (only care if > 200mm to avoid spam in sidebar)
+                        // This logic is separate from fetching details for population
+                        // We will let the "idsToFetch" logic handle data retrieval, 
+                        // but here we mark it as "needs zone creation"
+                    }
+                });
+
+                // Send updates for existing zones immediately
+                if (updates.length > 0 && onCriticalZonesUpdate) {
+                    onCriticalZonesUpdate(updates);
+                }
+
+                // Fetch details for ALL new IDs (to get population for global stats)
+                // We process them in parallel
+                if (idsToFetch.length > 0) {
+                    // Fetch all missing details to build accurate global stats
+                    Promise.all(idsToFetch.map(item => fetchZoneDetails(item.id, item.depthMm)));
+                }
+            }
+        } catch (err) {
+            console.error("Error polling flood status:", err);
+        }
+    };
+
+    const fetchZoneDetails = async (id, depthMm) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/get-board/${id}`, {
+                headers: getAuthHeaders()
+            });
+            const json = await res.json();
+            
+            if (json.success && json.data) {
+                const { tags, bounds } = json.data;
+                const name = tags.name || `Khu vực #${id}`;
+                const province = "Thừa Thiên Huế"; 
+                const levelM = (depthMm / 1000).toFixed(1);
+                
+                // 1. Cache Population
+                let pop = 0;
+                if (tags && tags.population) {
+                    const rawPop = tags.population.toString().replace(/,/g, '');
+                    pop = parseInt(rawPop, 10);
+                }
+                if (isNaN(pop)) pop = 0;
+                populationCacheRef.current[id] = pop;
+
+                // 2. Create Critical Zone if severity matches
+                let severity = 'low';
+                if (depthMm > 1000) severity = 'critical';
+                else if (depthMm > 500) severity = 'high';
+                else if (depthMm > 200) severity = 'medium';
+
+                if (severity !== 'low') {
+                    const newZone = {
+                        id: id,
+                        location: name,
+                        district: province,
+                        level: levelM,
+                        severity: severity,
+                        timestamp: Date.now(), 
+                        status: 'rising', 
+                        bounds: bounds,
+                        rawData: json.data 
+                    };
+                    if (onCriticalZonesUpdate) {
+                        onCriticalZonesUpdate([newZone]);
+                    }
+                }
+
+                // 3. Update global stats after fetching (if idle)
+                if (!selectedZoneId && !selectionCoords) {
+                    calculateAndSetGlobalStats();
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching zone details:", err);
+        }
+    };
+
+    fetchFloodStatus();
+    const intervalId = setInterval(fetchFloodStatus, 10000); // Poll every 10s
+    return () => clearInterval(intervalId);
+  }, [zones, selectedZoneId, selectionCoords, onCriticalZonesUpdate, onStatsUpdate, token]); 
+
+  // Handle FlyTo Zone (Bounds or Lat/Lng)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !selectedZoneId) return;
 
     const selectedZone = zones.find(z => z.id === selectedZoneId);
     if (selectedZone) {
-        const [lat, lng] = getZoneLatLng(selectedZone.x, selectedZone.y);
+        if (selectedZone.bounds) {
+            const { minlat, minlon, maxlat, maxlon } = selectedZone.bounds;
+            const bounds = L.latLngBounds([minlat, minlon], [maxlat, maxlon]);
+            map.flyToBounds(bounds, { animate: true, duration: 1.2, padding: [50, 50] });
+        } else if (selectedZone.x && selectedZone.y) {
+             const centerLat = 16.4637;
+             const centerLng = 107.5909;
+             const lat = centerLat - ((selectedZone.y - 50) / 100) * 0.1;
+             const lng = centerLng + ((selectedZone.x - 50) / 100) * 0.1;
+             map.flyTo([lat, lng], 14, { animate: true });
+        }
         
-        // Fly to location
-        map.flyTo([lat, lng], 15, {
-            animate: true,
-            duration: 1.2
-        });
-
-        // Open Popup for the specific marker
         const marker = markersRef.current[selectedZoneId];
-        if (marker) {
-            marker.openPopup();
+        if (marker) marker.openPopup();
+        
+        // Update stats for the specific zone
+        // We use cached population if available
+        const pop = populationCacheRef.current[selectedZoneId] || 0;
+        const depthMm = floodStatusRef.current[selectedZoneId] || (parseFloat(selectedZone.level) * 1000);
+        
+        if (onStatsUpdate) {
+             onStatsUpdate({
+                population: pop,
+                avgFloodLevel: (depthMm / 1000).toFixed(2),
+                food: (pop * 0.05 / 1000).toFixed(1),
+                workers: Math.floor(pop / 1000) + 5
+            });
         }
     }
   }, [selectedZoneId, zones]);
 
-  // Handle Rescue Team & Relief Point Layers
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    // 1. Manage Rescue Teams
-    rescueMarkersRef.current.forEach(m => m.remove());
-    rescueMarkersRef.current = [];
-
-    if (activeLayers && activeLayers.includes('Đội cứu hộ')) {
-        MOCK_RESCUE_TEAMS.forEach(team => {
-            const [lat, lng] = getZoneLatLng(team.x, team.y);
-            
-            const colorClass = team.status === 'busy' ? 'bg-red-500' : 'bg-green-500';
-            const iconHtml = `
-                <div class="relative flex items-center justify-center">
-                    <div class="w-6 h-6 rounded-md shadow-md border-2 border-white ${colorClass} flex items-center justify-center">
-                        <span class="material-symbols-outlined !text-[16px] text-white">ambulance</span>
-                    </div>
-                </div>
-            `;
-
-            const icon = L.divIcon({
-                html: iconHtml,
-                className: 'custom-div-icon',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            });
-
-            const marker = L.marker([lat, lng], { icon }).addTo(map);
-            
-            const popupContent = `
-                <div class="font-sans min-w-[120px]">
-                    <h4 class="font-bold text-sm text-gray-800">${team.name}</h4>
-                    <p class="text-xs ${team.status === 'busy' ? 'text-red-500 font-bold' : 'text-green-600'}">
-                        ${team.status === 'busy' ? 'Đang làm nhiệm vụ' : 'Sẵn sàng'}
-                    </p>
-                </div>
-            `;
-            marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
-            
-            rescueMarkersRef.current.push(marker);
-        });
-    }
-
-    // 2. Manage Relief Points
-    reliefMarkersRef.current.forEach(m => m.remove());
-    reliefMarkersRef.current = [];
-
-    if (activeLayers && activeLayers.includes('Điểm cứu trợ')) {
-        MOCK_RELIEF_POINTS.forEach(point => {
-            const [lat, lng] = getZoneLatLng(point.x, point.y);
-            
-            let iconName = 'home';
-            let bgClass = 'bg-blue-600';
-            if (point.type === 'food') { iconName = 'inventory_2'; bgClass = 'bg-green-600'; }
-            if (point.type === 'medical') { iconName = 'medical_services'; bgClass = 'bg-red-500'; }
-            
-            const iconHtml = `
-                <div class="relative flex items-center justify-center">
-                     <div class="w-7 h-7 rounded-full shadow-lg border-2 border-white ${bgClass} flex items-center justify-center">
-                        <span class="material-symbols-outlined !text-[16px] text-white">${iconName}</span>
-                    </div>
-                    <div class="absolute -bottom-1 w-2 h-2 bg-white rotate-45 border-r border-b border-gray-200"></div>
-                </div>
-            `;
-
-            const icon = L.divIcon({
-                html: iconHtml,
-                className: 'custom-div-icon',
-                iconSize: [28, 28],
-                iconAnchor: [14, 30]
-            });
-
-            const marker = L.marker([lat, lng], { icon }).addTo(map);
-
-            const popupContent = `
-                <div class="font-sans min-w-[140px]">
-                    <div class="flex items-center gap-1 mb-1">
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-white ${bgClass}">
-                            ${point.type === 'shelter' ? 'Lưu trú' : point.type === 'food' ? 'Lương thực' : 'Y tế'}
-                        </span>
-                    </div>
-                    <h4 class="font-bold text-sm text-gray-800 mb-0.5">${point.name}</h4>
-                    <p class="text-xs text-gray-600 font-medium">Sức chứa/Tình trạng:</p>
-                    <p class="text-xs font-bold text-gray-800">${point.capacity}</p>
-                </div>
-            `;
-            marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
-
-            reliefMarkersRef.current.push(marker);
-        });
-    }
-
-  }, [activeLayers]);
-
-  // Handle Timeframe Change
-  useEffect(() => {
-    if (mapInstanceRef.current && timeFrame) {
-        loadFloodHeatmap(mapInstanceRef.current);
-    }
-  }, [timeFrame]);
 
   // Handle Search Location Update
   useEffect(() => {
@@ -275,11 +580,15 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     if (!map) return;
 
     setIsLoadingHeatmap(true);
-    setHeatmapError(null);
 
     try {
-      const timeParam = timeFrame ? `&time=${timeFrame.id}` : '';
-      const response = await fetch(`${API_BASE_URL}/flood-depth/map?t=${Date.now()}${timeParam}`);
+      // Map the selected timeframe directly to supported API params
+      const supportedTimes = ['now', 'future-5', 'future-30'];
+      const timeParam = supportedTimes.includes(timeFrame?.id) ? timeFrame.id : 'now';
+
+      const response = await fetch(`${API_BASE_URL}/flood-depth/map?time=${timeParam}&t=${Date.now()}`, {
+        headers: getAuthHeaders()
+      });
       const result = await response.json();
 
       if (!result.success) {
@@ -317,49 +626,47 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       console.error('Error loading flood heatmap:', err);
       if (retryCount < 2) {
           setTimeout(() => loadFloodHeatmap(map, retryCount + 1), 2000);
-      } else {
-          setHeatmapError('Không thể tải bản đồ nhiệt');
       }
     } finally {
       setIsLoadingHeatmap(false);
     }
   };
 
-  // Function to calculate region flood depth
-  const calculateRegionFloodDepth = async (bounds) => {
-    try {
-      const payload = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      };
-
-      const response = await fetch(`${API_BASE_URL}/flood-depth/region`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        return result.data;
-      }
-    } catch (error) {
-      console.error('Error calculating region flood depth:', error);
+  // Reload heatmap when timeFrame changes
+  useEffect(() => {
+    if (mapInstanceRef.current && timeFrame) {
+        loadFloodHeatmap(mapInstanceRef.current);
     }
-    return null;
-  };
+  }, [timeFrame]);
 
-  // Function to fetch and draw borders
+  // Toggle heatmap visibility
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !heatmapOverlayRef.current) return;
+    
+    if (showHeatmap) {
+      if (!map.hasLayer(heatmapOverlayRef.current)) {
+        heatmapOverlayRef.current.addTo(map);
+      }
+    } else {
+      if (map.hasLayer(heatmapOverlayRef.current)) {
+        heatmapOverlayRef.current.remove();
+      }
+    }
+  }, [showHeatmap]);
+
+  // Update heatmap opacity
+  useEffect(() => {
+    if (heatmapOverlayRef.current) {
+      heatmapOverlayRef.current.setOpacity(heatmapOpacity);
+    }
+  }, [heatmapOpacity]);
+
   const fetchAndDrawBorders = async (bounds) => {
     const map = mapInstanceRef.current;
     if (!map) return null;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -378,7 +685,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
         const res = await fetch(`${API_BASE_URL}/admin/selected-area`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(payload),
             signal
         });
@@ -387,10 +694,20 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         if (json.success && json.data.wards) {
             const fetchPromises = json.data.wards.map(async (ward) => {
                 try {
-                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { signal });
-                    const detailJson = await detailRes.json();
+                    // Check cache first for population
+                    let pop = populationCacheRef.current[ward.id];
+                    console.log("Ward ID:", ward.id, "Cached Population:", pop);
+                    let detailJson;
+
+                    // If not in cache or we need geometry anyway, fetch it
+                    const detailRes = await fetch(`${API_BASE_URL}/admin/get-board/${ward.id}`, { 
+                        signal,
+                        headers: getAuthHeaders()
+                    });
+                    detailJson = await detailRes.json();
                     
                     if (detailJson.success && detailJson.data) {
+                        // Draw borders
                         if (detailJson.data.members) {
                             detailJson.data.members.forEach((m) => {
                                 if (m.geometry && m.geometry.length > 1) {
@@ -405,127 +722,119 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                             });
                         }
                         
-                        let pop = 0;
-                        if (detailJson.data.tags && detailJson.data.tags.population) {
+                        // Parse Population if not cached
+                        if (pop === undefined && detailJson.data.tags && detailJson.data.tags.population) {
                             const rawPop = detailJson.data.tags.population.toString().replace(/,/g, '');
                             pop = parseInt(rawPop, 10);
-                            if (isNaN(pop)) pop = 0;
+                            if (!isNaN(pop)) {
+                                populationCacheRef.current[ward.id] = pop; // Update Cache
+                            }
                         }
-
-                        return { pop };
                     }
-                } catch (err) {
-                   // silent fail
-                }
-                return { pop: 0 };
+                    
+                    if (pop === undefined) pop = 0;
+
+                    let depthMm = 0;
+                    if (floodStatusRef.current && floodStatusRef.current[ward.id] !== undefined) {
+                        depthMm = floodStatusRef.current[ward.id];
+                    } else if (detailJson?.data?.tags?.flood_depth) {
+                        depthMm = parseFloat(detailJson.data.tags.flood_depth);
+                    }
+                    if (isNaN(depthMm)) depthMm = 0;
+
+                    return { pop, depthMm };
+                } catch (err) { }
+                return { pop: 0, depthMm: 0 };
             });
 
             const results = await Promise.all(fetchPromises);
+            
             const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
+            const totalDepthMm = results.reduce((sum, curr) => sum + curr.depthMm, 0);
+            const validCount = results.filter(r => r.depthMm > 0 || r.pop > 0).length; // Rough filter for average
+            const avgFloodDepthMm = validCount > 0 ? totalDepthMm / validCount : 0;
+            const avgFloodDepthM = avgFloodDepthMm / 1000;
 
-            return { totalPopulation };
+            return { totalPopulation, avgFloodDepth: avgFloodDepthM };
         }
     } catch (error) {
-        if (error.name !== 'AbortError') {
-            console.error("Error fetching borders:", error);
-        }
+        if (error.name !== 'AbortError') console.error("Error fetching borders:", error);
     }
     return null;
   };
 
-  // Function to fetch district by point
   const fetchDistrictByPoint = async (lat, lng) => {
       const map = mapInstanceRef.current;
       if (!map) return;
 
-      setIsLoadingBorders(true); // Reusing loading state
-      pointSelectionLayerRef.current.clearLayers(); // Clear previous selection
+      setIsLoadingBorders(true);
+      pointSelectionLayerRef.current.clearLayers();
 
       try {
           const payload = { lat, lng };
           
           const response = await fetch(`${API_BASE_URL}/admin/point-district`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(),
               body: JSON.stringify(payload)
           });
           const result = await response.json();
 
           if (result.success && result.data) {
-              const { district, geometry, properties, point } = result.data;
+              const { geometry, point } = result.data;
 
-              // 1. Draw Polygon
-              if (geometry && geometry.length > 0) {
-                  const latlngs = geometry.map(p => [p.lat, p.lon]);
+              if (geometry && geometry.length > 2) {
+                  const hullPoints = getConvexHull(geometry);
+                  const latlngs = hullPoints.map(p => [p.lat, p.lon]);
+                  
                   L.polygon(latlngs, {
-                      color: "#9333ea", // Purple
-                      weight: 3,
-                      fillColor: "#9333ea",
+                      color: "#9333ea",
+                      weight: 4,
+                      opacity: 1,
+                      fillColor: "#9333ea", 
                       fillOpacity: 0.15,
-                      dashArray: "5, 5"
+                      lineCap: 'round',
+                      lineJoin: 'round',
+                      smoothFactor: 1.0
                   }).addTo(pointSelectionLayerRef.current);
+                  
+                  const bounds = L.latLngBounds(latlngs);
+                  map.flyToBounds(bounds, { padding: [80, 80], duration: 1.2 });
               }
 
-              // 2. Draw Point Marker
               const icon = L.divIcon({
                   html: `
                     <div class="relative flex items-center justify-center -translate-y-1">
-                        <span class="material-symbols-outlined text-purple-600 !text-[32px] drop-shadow-md">location_on</span>
+                        <span class="material-symbols-outlined text-purple-600 !text-[36px] drop-shadow-md">location_on</span>
                     </div>
                   `,
                   className: 'custom-div-icon',
-                  iconSize: [32, 32],
-                  iconAnchor: [16, 30]
+                  iconSize: [36, 36],
+                  iconAnchor: [18, 34]
               });
               L.marker([point.lat, point.lng], { icon }).addTo(pointSelectionLayerRef.current);
 
-              // 3. Update State
               setPointSelectionData(result.data);
           } else {
-             console.error("Failed to get district info:", result.error);
              setPointSelectionData(null);
           }
       } catch (error) {
           console.error("Error fetching district by point:", error);
       } finally {
           setIsLoadingBorders(false);
-          setIsPointSelectionMode(false); // Disable mode after selection
+          setIsPointSelectionMode(false);
       }
   };
 
-  // Effect to toggle heatmap visibility
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !heatmapOverlayRef.current) return;
-    
-    if (showHeatmap) {
-      if (!map.hasLayer(heatmapOverlayRef.current)) {
-        heatmapOverlayRef.current.addTo(map);
-      }
-    } else {
-      if (map.hasLayer(heatmapOverlayRef.current)) {
-        heatmapOverlayRef.current.remove();
-      }
-    }
-  }, [showHeatmap]);
-
-  // Effect to update heatmap opacity
-  useEffect(() => {
-    if (heatmapOverlayRef.current) {
-      heatmapOverlayRef.current.setOpacity(heatmapOpacity);
-    }
-  }, [heatmapOpacity]);
-
-  // Handle Rectangle Selection Mode Interactions
+  // Handle Rectangle Selection
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Only active if rectangle mode is on
     if (isSelectionMode) {
       map.dragging.disable();
       map.getContainer().style.cursor = 'crosshair';
-    } else if (!isPointSelectionMode) { // Only reset if point mode is also off
+    } else if (!isPointSelectionMode) {
       map.dragging.enable();
       map.getContainer().style.cursor = '';
       isDrawingRef.current = false;
@@ -574,20 +883,16 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         setIsLoadingBorders(true);
 
         try {
-            const [wardStats, floodAnalysis] = await Promise.all([
-                fetchAndDrawBorders(bounds),
-                calculateRegionFloodDepth(bounds)
-            ]);
-
+            const wardStats = await fetchAndDrawBorders(bounds);
+           
             setSelectionCoords({
                 nw: { lat: northWest.lat.toFixed(5), lng: northWest.lng.toFixed(5) },
                 se: { lat: southEast.lat.toFixed(5), lng: southEast.lng.toFixed(5) },
-                floodAnalysis: floodAnalysis
             });
 
             if (onStatsUpdate) {
                 const population = wardStats?.totalPopulation || 0;
-                const avgDepth = floodAnalysis?.average_depth || 0;
+                const avgDepth = wardStats?.avgFloodDepth || 0;
 
                 onStatsUpdate({
                     population: population,
@@ -617,13 +922,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
     };
   }, [isSelectionMode]);
 
-  // Handle Point Selection Mode Interactions
+  // Handle Point Selection
   useEffect(() => {
       const map = mapInstanceRef.current;
       if (!map) return;
 
       if (isPointSelectionMode) {
-          map.getContainer().style.cursor = 'help'; // Use help or crosshair
+          map.getContainer().style.cursor = 'help';
       } else if (!isSelectionMode) {
           map.getContainer().style.cursor = '';
       }
@@ -640,71 +945,117 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       };
   }, [isPointSelectionMode]);
 
-
-  // Handle Markers (Zones)
+  // Handle Markers & Polygons for Critical Zones
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
+    // Clear existing markers from map
     Object.values(markersRef.current).forEach((marker: any) => marker.remove());
     markersRef.current = {};
+    
+    // Clear existing polygons from map
+    Object.values(polygonLayersRef.current).forEach((layer: any) => layer.remove());
+    polygonLayersRef.current = {};
 
     zones.forEach(zone => {
-      const [lat, lng] = getZoneLatLng(zone.x, zone.y);
+      // 1. Prepare Boundary Polygon if rawData is available (BUT DO NOT ADD TO MAP YET)
+      if (zone.rawData && zone.rawData.members) {
+         // Determine color based on severity
+         let color = '#3b82f6'; // blue (Low)
+         if (zone.severity === 'critical') color = '#dc2626'; // red
+         else if (zone.severity === 'high') color = '#f97316'; // orange
+         else if (zone.severity === 'medium') color = '#eab308'; // yellow
 
-      let colorClass = 'bg-blue-500';
-      let ringClass = 'ring-blue-500';
-      if (zone.severity === 'critical') { colorClass = 'bg-red-600'; ringClass = 'ring-red-600'; }
-      else if (zone.severity === 'high') { colorClass = 'bg-orange-500'; ringClass = 'ring-orange-500'; }
-      else if (zone.severity === 'medium') { colorClass = 'bg-yellow-500'; ringClass = 'ring-yellow-500'; }
+         const group = L.featureGroup();
+         zone.rawData.members.forEach((m) => {
+            if (m.geometry && m.geometry.length > 1) {
+                const latlngs = m.geometry.map((p) => [p.lat, p.lon]);
+                L.polyline(latlngs, {
+                    color: color,
+                    weight: 3,
+                    opacity: 0.8
+                }).addTo(group);
+            }
+         });
+         
+         // Store in ref, don't add to map unless selected
+         polygonLayersRef.current[zone.id] = group;
+      }
 
-      const isSelected = selectedZoneId === zone.id;
-      const size = isSelected ? 'w-6 h-6' : 'w-4 h-4';
-      const ring = isSelected ? `ring-4 ${ringClass} ring-opacity-30` : 'border-2 border-white shadow-lg';
-      
-      const html = `
-        <div class="relative flex items-center justify-center">
-            ${(zone.severity === 'critical' || zone.severity === 'high' || isSelected) ? 
-                `<div class="absolute w-full h-full rounded-full animate-ping opacity-75 ${colorClass}"></div>` : ''}
-            <div class="relative ${size} rounded-full transition-all duration-300 ${colorClass} ${ring}"></div>
-        </div>
-      `;
+      // 2. Draw Marker at Center (Always Visible)
+      let lat, lng;
+      if (zone.bounds) {
+          lat = (zone.bounds.minlat + zone.bounds.maxlat) / 2;
+          lng = (zone.bounds.minlon + zone.bounds.maxlon) / 2;
+      } else if (zone.x && zone.y) {
+          // Fallback
+          lat = 16.4637 - ((zone.y - 50) / 100) * 0.1;
+          lng = 107.5909 + ((zone.x - 50) / 100) * 0.1;
+      }
 
-      const icon = L.divIcon({
-        html: html,
-        className: 'custom-div-icon', 
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-      });
+      if (lat && lng) {
+          let colorClass = 'bg-[#3b82f6]'; // blue
+          let ringClass = 'ring-[#3b82f6]'; 
+          if (zone.severity === 'critical') { colorClass = 'bg-[#dc2626]'; ringClass = 'ring-[#dc2626]'; }
+          else if (zone.severity === 'high') { colorClass = 'bg-[#f97316]'; ringClass = 'ring-[#f97316]'; }
+          else if (zone.severity === 'medium') { colorClass = 'bg-[#eab308]'; ringClass = 'ring-[#eab308]'; }
 
-      const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
-      
-      marker.on('click', (e) => {
-        if (isSelectionMode || isPointSelectionMode) return; // Disable zone selection during tool usage
-        L.DomEvent.stopPropagation(e);
-        onZoneSelect(zone.id);
-      });
-
-      const popupContent = `<div class="font-bold text-sm">${zone.location}</div>`;
-      marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup' });
-      if (isSelected) marker.openPopup();
-
-      markersRef.current[zone.id] = marker;
+          const isSelected = selectedZoneId === zone.id;
+          const size = isSelected ? 'w-6 h-6' : 'w-4 h-4';
+          const ring = isSelected ? `ring-4 ${ringClass} ring-opacity-30` : 'border-2 border-white shadow-lg';
+          
+          const html = `
+            <div class="relative flex items-center justify-center">
+                ${(zone.severity === 'critical' || zone.severity === 'high' || isSelected) ? 
+                    `<div class="absolute w-full h-full rounded-full animate-ping opacity-75 ${colorClass}"></div>` : ''}
+                <div class="relative ${size} rounded-full transition-all duration-300 ${colorClass} ${ring}"></div>
+            </div>
+          `;
+          const icon = L.divIcon({
+            html: html,
+            className: 'custom-div-icon', 
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+          
+          const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
+          marker.on('click', (e) => {
+            // Check refs instead of state
+            if (isSelectionModeRef.current || isPointSelectionModeRef.current) return;
+            L.DomEvent.stopPropagation(e);
+            onZoneSelect(zone.id);
+          });
+          
+          const popupContent = `
+            <div class="min-w-[180px] font-sans">
+                 <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                    <span class="font-bold px-2 py-0.5 rounded text-[10px] uppercase text-white ${
+                        zone.severity === 'critical' ? 'bg-[#dc2626]' :
+                        zone.severity === 'high' ? 'bg-[#f97316]' :
+                        zone.severity === 'medium' ? 'bg-[#eab308]' : 'bg-[#3b82f6]'
+                    }">Cảnh báo</span>
+                </div>
+                <p class="font-bold text-gray-800 text-sm mb-0.5">${zone.location}</p>
+                <p class="text-xs text-gray-500 mb-2">${zone.district}</p>
+                <div class="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                    <span class="text-gray-600 text-xs font-semibold">Mực nước:</span>
+                    <span class="font-bold text-red-600 text-sm">${zone.level}m</span>
+                </div>
+            </div>
+          `;
+          marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup', offset: [0, -10] });
+          if (isSelected) marker.openPopup();
+          markersRef.current[zone.id] = marker;
+      }
     });
-  }, [zones, selectedZoneId, onZoneSelect, isSelectionMode, isPointSelectionMode]);
 
-  const handleZoom = (type) => {
-    if (mapInstanceRef.current) {
-      if (type === 'in') mapInstanceRef.current.zoomIn();
-      else mapInstanceRef.current.zoomOut();
+    // 3. Only add the polygon layer for the SELECTED zone to the map
+    if (selectedZoneId && polygonLayersRef.current[selectedZoneId]) {
+        polygonLayersRef.current[selectedZoneId].addTo(map);
     }
-  };
 
-  const handleLocate = () => {
-     if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([10.762622, 106.660172], 14);
-     }
-  };
+  }, [zones, selectedZoneId, onZoneSelect]); // Removed isSelectionMode from deps to prevent re-render
 
   return (
     <div className="absolute inset-0 w-full h-full bg-gray-200">
@@ -715,7 +1066,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             {isLoadingHeatmap ? (
                 <>
                     <span className="material-symbols-outlined !text-[16px] animate-spin">sync</span>
-                    {timeFrame ? `Đang tải: ${timeFrame.label}...` : "Đang tải dữ liệu ngập..."}
+                    {timeFrame ? `Đang tải: ${timeFrame.label}...` : "Đang tải bản đồ ngập..."}
                 </>
             ) : (
                 <>
@@ -725,7 +1076,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             )}
         </div>
 
-        {/* Analysis Loading */}
+        {/* Loading Indicator */}
         {isLoadingBorders && (
             <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-primary/90 text-white backdrop-blur px-4 py-2 rounded-full shadow-xl text-xs font-bold flex items-center gap-2 z-[1000] pointer-events-none animate-bounce">
                 <span className="material-symbols-outlined !text-[16px] animate-spin">analytics</span>
@@ -733,13 +1084,19 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
             </div>
         )}
 
-        {/* RECTANGLE Selection Details Panel */}
+        {/* Dispatch Panel Integration - Only when logged in */}
+        {isLoggedIn && (
+            <DispatchPanel isOpen={isDispatchOpen} onClose={() => setIsDispatchOpen(false)} />
+        )}
+
+        {/* Selection Details Panel */}
         {selectionCoords && (
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-white/50 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full">
              <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
                 <span className="material-symbols-outlined text-primary">area_chart</span>
                 <span className="font-bold text-gray-800 text-sm">Kết Quả Phân Tích Vùng</span>
                 <button 
+                  type="button"
                   onClick={() => {
                     setSelectionCoords(null);
                     if(selectionRectRef.current) {
@@ -748,116 +1105,44 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     }
                     borderLayersRef.current.forEach(layer => layer.remove());
                     borderLayersRef.current = [];
-                    if (onStatsUpdate) onStatsUpdate(null);
+                    // Recalculate global stats on deselect
+                    calculateAndSetGlobalStats();
                   }}
                   className="ml-auto hover:bg-gray-100 rounded-full p-1 transition-colors"
                 >
                   <span className="material-symbols-outlined !text-[18px] text-gray-400">close</span>
                 </button>
              </div>
-
-             {selectionCoords.floodAnalysis ? (
-               <div className="space-y-3">
-                 <div className="grid grid-cols-3 gap-3">
-                   <div className="bg-blue-50 p-2.5 rounded-lg text-center border border-blue-100">
-                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Trung Bình</p>
-                     <p className="font-bold text-blue-700 text-lg">{selectionCoords.floodAnalysis.average_depth?.toFixed(2)}m</p>
-                   </div>
-                   <div className="bg-red-50 p-2.5 rounded-lg text-center border border-red-100">
-                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Cao Nhất</p>
-                     <p className="font-bold text-red-700 text-lg">{selectionCoords.floodAnalysis.max_depth?.toFixed(2)}m</p>
-                   </div>
-                   <div className="bg-green-50 p-2.5 rounded-lg text-center border border-green-100">
-                     <p className="text-[10px] text-gray-500 font-semibold uppercase">Thấp Nhất</p>
-                     <p className="font-bold text-green-700 text-lg">{selectionCoords.floodAnalysis.min_depth?.toFixed(2)}m</p>
-                   </div>
-                 </div>
-                 
-                 <div className="bg-gray-50 rounded-lg p-2.5 text-xs border border-gray-100">
-                    <div className="flex justify-between mb-1">
-                        <span className="text-gray-600">Độ phủ ngập:</span>
-                        <span className="font-bold text-gray-800">{selectionCoords.floodAnalysis.coverage_percentage?.toFixed(1)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${selectionCoords.floodAnalysis.coverage_percentage}%` }}></div>
-                    </div>
-                 </div>
-               </div>
-             ) : (
-                <div className="text-center py-2 text-gray-500 text-xs italic">Không có dữ liệu ngập cho vùng này</div>
-             )}
-          </div>
-        )}
-
-        {/* POINT Selection Details Panel */}
-        {pointSelectionData && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur shadow-2xl rounded-xl p-4 border border-purple-200 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-lg w-full ring-1 ring-purple-100">
-             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
-                <span className="material-symbols-outlined text-purple-600">location_on</span>
-                <span className="font-bold text-gray-800 text-sm">Thông Tin Điểm Chọn</span>
-                <button 
-                  onClick={() => {
-                    setPointSelectionData(null);
-                    pointSelectionLayerRef.current.clearLayers();
-                  }}
-                  className="ml-auto hover:bg-gray-100 rounded-full p-1 transition-colors"
-                >
-                  <span className="material-symbols-outlined !text-[18px] text-gray-400">close</span>
-                </button>
-             </div>
-
-             <div className="space-y-3">
-                 <div className="flex justify-between items-start">
-                     <div>
-                         <h3 className="text-lg font-bold text-gray-800 leading-tight">{pointSelectionData.district.name}</h3>
-                         <p className="text-xs text-gray-500">{pointSelectionData.district.type} - Level {pointSelectionData.district.admin_level}</p>
-                     </div>
-                     <div className="text-right">
-                         <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                             ID: {pointSelectionData.district.id}
-                         </span>
-                     </div>
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-3">
-                   <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex flex-col justify-center">
-                     <div className="flex items-center gap-1.5 mb-1">
-                        <span className="material-symbols-outlined text-gray-400 !text-[16px]">groups</span>
-                        <p className="text-[10px] text-gray-500 font-semibold uppercase">Dân Số</p>
-                     </div>
-                     <p className="font-bold text-gray-800 text-lg">
-                        {pointSelectionData.properties.population.toLocaleString()}
-                     </p>
-                   </div>
-                   <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex flex-col justify-center">
-                     <div className="flex items-center gap-1.5 mb-1">
-                        <span className="material-symbols-outlined text-blue-400 !text-[16px]">water</span>
-                        <p className="text-[10px] text-blue-500 font-semibold uppercase">Độ Ngập Hiện Tại</p>
-                     </div>
-                     <p className="font-bold text-blue-700 text-lg">
-                        {pointSelectionData.properties.flood_depth}m
-                     </p>
-                   </div>
-                 </div>
-                 
-                 <div className="flex items-center gap-2 text-[10px] text-gray-400 justify-end pt-1">
-                     <span>Diện tích: {pointSelectionData.properties.area_km2} km²</span>
-                 </div>
+             <div className="text-center py-2 text-gray-500 text-xs italic">
+                Đã chọn vùng: {selectionCoords.nw.lat}, {selectionCoords.nw.lng}
              </div>
           </div>
         )}
 
-        {/* Heatmap Controls & Legend (Same as before) */}
+        {/* Heatmap Controls & Legend */}
         {showHeatmap && heatmapData && !isLoadingHeatmap && (
             <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/50 w-64">
                 <div className="flex justify-between items-start mb-3">
                     <div>
-                        <h3 className="font-bold text-gray-800 text-sm">Bản đồ nhiệt</h3>
-                        <p className="text-[10px] text-gray-500">Độ sâu ngập lụt (m)</p>
+                        <h3 className="font-bold text-gray-800 text-sm">Bản đồ ngập lụt</h3>
+                        <p className="text-[10px] text-gray-500">Độ sâu ngập (mét)</p>
                     </div>
                     <div className="flex gap-1">
-                        <button onClick={() => loadFloodHeatmap(mapInstanceRef.current)} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Làm mới">
+                        <button 
+                          type="button"
+                          onClick={() => loadFloodHeatmap(mapInstanceRef.current)} 
+                          className="p-1 hover:bg-gray-100 rounded text-gray-500" 
+                          title="Làm mới"
+                        >
                             <span className="material-symbols-outlined !text-[16px]">refresh</span>
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setShowHeatmap(false)} 
+                          className="p-1 hover:bg-gray-100 rounded text-gray-500" 
+                          title="Ẩn"
+                        >
+                            <span className="material-symbols-outlined !text-[16px]">visibility_off</span>
                         </button>
                     </div>
                 </div>
@@ -900,37 +1185,63 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
         {/* Map Controls */}
         <div className="absolute right-4 top-4 flex flex-col items-end gap-2 z-[1000]">
+            {/* Zoom Controls */}
             <div className="flex flex-col rounded-xl bg-white/90 shadow-lg backdrop-blur-sm ring-1 ring-black/5 overflow-hidden">
-                <button onClick={() => handleZoom('in')} className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 border-b border-gray-100 transition-colors">
+                <button 
+                  type="button"
+                  onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.zoomIn(); }} 
+                  className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 border-b border-gray-100 transition-colors">
                     <span className="material-symbols-outlined text-gray-700 !text-[20px]">add</span>
                 </button>
-                <button onClick={() => handleZoom('out')} className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 transition-colors">
+                <button 
+                  type="button"
+                  onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.zoomOut(); }} 
+                  className="h-10 w-10 flex items-center justify-center hover:bg-gray-50 transition-colors">
                     <span className="material-symbols-outlined text-gray-700 !text-[20px]">remove</span>
                 </button>
             </div>
-            
+
+            {/* Heatmap Toggle */}
             <div className="flex flex-col rounded-xl bg-white/90 shadow-lg backdrop-blur-sm ring-1 ring-black/5 overflow-hidden mt-2">
                  <button 
+                    type="button"
                     onClick={() => setShowHeatmap(!showHeatmap)}
                     className={`h-10 w-10 flex items-center justify-center transition-colors ${showHeatmap ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50 text-gray-600'}`}
-                    title="Bật/Tắt Heatmap"
+                    title="Bật/Tắt bản đồ ngập"
                 >
                     <span className="material-symbols-outlined !text-[20px]">layers</span>
                 </button>
             </div>
 
-            {/* Rectangle Selection Tool */}
+            {/* Toggle Dispatch Panel Button - Only when logged in */}
+            {isLoggedIn && (
+                <button
+                    type="button"
+                    onClick={() => setIsDispatchOpen(!isDispatchOpen)}
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
+                        isDispatchOpen 
+                        ? 'bg-primary text-white ring-primary' 
+                        : 'bg-white/90 hover:bg-gray-100 text-gray-700'
+                    }`}
+                    title="Gửi tin nhắn điều phối"
+                >
+                    <span className="material-symbols-outlined !text-[20px]">{isDispatchOpen ? 'chat' : 'campaign'}</span>
+                </button>
+            )}
+
+            {/* Selection Tool Button */}
             <button 
+                type="button"
                 onClick={() => {
                     setIsSelectionMode(!isSelectionMode);
                     setIsPointSelectionMode(false);
                     setPointSelectionData(null);
                     pointSelectionLayerRef.current.clearLayers();
                 }}
-                className={`h-10 w-10 flex items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
+                className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
                     isSelectionMode 
                     ? 'bg-primary text-white ring-primary' 
-                    : 'bg-white/90 hover:bg-gray-50 text-gray-700'
+                    : 'bg-white/90 hover:bg-gray-100 text-gray-700'
                 }`}
                 title="Chọn vùng (Hình chữ nhật)"
             >
@@ -938,31 +1249,11 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                   {isSelectionMode ? 'check_box' : 'crop_free'}
                 </span>
             </button>
-
-            {/* Point Selection Tool */}
-            <button 
-                onClick={() => {
-                    setIsPointSelectionMode(!isPointSelectionMode);
-                    setIsSelectionMode(false);
-                    setSelectionCoords(null);
-                    if (selectionRectRef.current) {
-                        selectionRectRef.current.remove();
-                        selectionRectRef.current = null;
-                    }
-                }}
-                className={`h-10 w-10 flex items-center justify-center rounded-xl shadow-lg backdrop-blur-sm ring-1 ring-black/5 transition-all mt-2 ${
-                    isPointSelectionMode 
-                    ? 'bg-purple-600 text-white ring-purple-600' 
-                    : 'bg-white/90 hover:bg-gray-50 text-gray-700'
-                }`}
-                title="Chọn điểm (Quận/Phường)"
-            >
-                <span className="material-symbols-outlined !text-[20px]">
-                  {isPointSelectionMode ? 'location_on' : 'pin_drop'}
-                </span>
-            </button>
             
-            <button onClick={handleLocate} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-50 ring-1 ring-black/5 transition-colors mt-2">
+            <button 
+               type="button"
+               onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.setView([16.4637, 107.5909], 12); }}
+               className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/90 shadow-lg backdrop-blur-sm hover:bg-gray-100 ring-1 ring-black/5 transition-colors mt-2">
                 <span className="material-symbols-outlined text-gray-700 !text-[20px]">my_location</span>
             </button>
         </div>
