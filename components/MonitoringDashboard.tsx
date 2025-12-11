@@ -105,7 +105,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
             isOpen={alertModalData.isOpen} 
             onClose={() => setAlertModalData({ ...alertModalData, isOpen: false })}
             zone={alertModalData.zone}
-            senderName="Huế's AquaSafe Admin" 
+            senderName="Nguyễn Văn A" 
           />
       )}
     </div>
