@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MonitoringSidebar } from './MonitoringSidebar';
 import { MonitoringMap } from './MonitoringMap';
 import { MonitoringStats } from './MonitoringStats';
+import { ZoneAlertModal } from './ZoneAlertModal';
 
 export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, token }) => {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
@@ -10,6 +11,9 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
   
   // State for map layers
   const [activeLayers, setActiveLayers] = useState([]);
+
+  // State for Alert Modal
+  const [alertModalData, setAlertModalData] = useState({ isOpen: false, zone: null });
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -67,6 +71,7 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
         activeLayers={activeLayers}
         onToggleLayer={toggleLayer}
         isLoggedIn={isLoggedIn}
+        onOpenAlertModal={(zone) => setAlertModalData({ isOpen: true, zone })}
       />
       
       <main className="relative flex flex-1 flex-col bg-gray-100 peer-focus-within:opacity-50 transition-opacity duration-300">
@@ -93,6 +98,16 @@ export const MonitoringDashboard = ({ searchLocation, timeFrame, isLoggedIn, tok
             )}
         </div>
       </main>
+
+      {/* Zone Alert Modal */}
+      {isLoggedIn && (
+          <ZoneAlertModal 
+            isOpen={alertModalData.isOpen} 
+            onClose={() => setAlertModalData({ ...alertModalData, isOpen: false })}
+            zone={alertModalData.zone}
+            senderName="Nguyễn Văn A" 
+          />
+      )}
     </div>
   );
 };

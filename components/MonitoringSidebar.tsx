@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // Helper component to render dynamic time ago (e.g. "1 min ago")
 const TimeAgo = ({ timestamp }) => {
@@ -25,8 +25,42 @@ const TimeAgo = ({ timestamp }) => {
     return <span>{timeString}</span>;
 };
 
-export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeLayers, onToggleLayer, isLoggedIn }) => {
+export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeLayers, onToggleLayer, isLoggedIn, onOpenAlertModal }) => {
   const [collapsed, setCollapsed] = useState(false);
+  
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState({
+      visible: false,
+      x: 0,
+      y: 0,
+      zone: null
+  });
+  const menuRef = useRef(null);
+
+  // Close context menu on click outside
+  useEffect(() => {
+      const handleClick = () => setContextMenu({ ...contextMenu, visible: false });
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+  }, [contextMenu]);
+
+  const handleContextMenu = (e, zone) => {
+      if (!isLoggedIn) return; // Only allow if logged in
+      e.preventDefault();
+      setContextMenu({
+          visible: true,
+          x: e.clientX,
+          y: e.clientY,
+          zone: zone
+      });
+  };
+
+  const handleSendAlert = () => {
+      if (contextMenu.zone && onOpenAlertModal) {
+          onOpenAlertModal(contextMenu.zone);
+      }
+      setContextMenu({ ...contextMenu, visible: false });
+  };
 
   return (
     <div className="relative h-full shrink-0 z-20">
@@ -94,6 +128,7 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
                         <div 
                             key={zone.id} 
                             onClick={() => onZoneSelect(zone.id)}
+                            onContextMenu={(e) => handleContextMenu(e, zone)}
                             className={`group relative rounded-lg border p-3.5 transition-all hover:shadow-md cursor-pointer animate-in fade-in slide-in-from-left-2 duration-300 ${
                             selectedZoneId === zone.id 
                                 ? 'border-primary bg-blue-50/40 ring-1 ring-primary shadow-sm' 
@@ -183,6 +218,34 @@ export const MonitoringSidebar = ({ zones, selectedZoneId, onZoneSelect, activeL
       >
         <span className="material-symbols-outlined !text-[20px]">{collapsed ? 'chevron_right' : 'chevron_left'}</span>
       </button>
+
+      {/* Custom Context Menu */}
+      {contextMenu.visible && (
+        <div 
+            ref={menuRef}
+            className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-100 py-1 min-w-[200px] animate-in fade-in zoom-in-95 duration-100"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+            <div className="px-3 py-2 border-b border-gray-100 mb-1">
+                <p className="text-xs font-bold text-gray-800 line-clamp-1">{contextMenu.zone.location}</p>
+                <p className="text-[10px] text-gray-500">Mức ngập: {contextMenu.zone.level}m</p>
+            </div>
+            <button 
+                onClick={handleSendAlert}
+                className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-gray-700 hover:text-primary flex items-center gap-2 transition-colors"
+            >
+                <span className="material-symbols-outlined !text-[18px]">campaign</span>
+                Gửi cảnh báo tới UBND
+            </button>
+            <button 
+                onClick={() => onZoneSelect(contextMenu.zone.id)}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 transition-colors"
+            >
+                <span className="material-symbols-outlined !text-[18px]">visibility</span>
+                Xem chi tiết
+            </button>
+        </div>
+      )}
     </div>
   );
 };
