@@ -398,7 +398,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 
                 json.data.forEach(item => {
                     const id = item.id;
-                    const newDepthMm = item.depth || 0;
+                    const newDepthMm = item.depth * 1000 || 0;
                     const oldDepthMm = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepthMm;
                     
                     // Update Flood Status Ref
