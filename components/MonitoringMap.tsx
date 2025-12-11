@@ -18,7 +18,7 @@ const getRandomCoord = () => {
 const MOCK_DEMO_ZONES = [
   {
     id: 'DEMO_01',
-    location: 'Phường Vĩnh Ninh',
+    location: 'Phường Vĩnh Ninh (Demo L1)',
     district: 'Thừa Thiên Huế',
     level: '0.25', // Level 1 (0.10 - 0.30)
     severity: 'medium', 
@@ -28,7 +28,7 @@ const MOCK_DEMO_ZONES = [
   },
   {
     id: 'DEMO_02',
-    location: 'Phường Thuận Lộc',
+    location: 'Phường Thuận Lộc (Demo L2)',
     district: 'Thừa Thiên Huế',
     level: '0.45', // Level 2 (0.31 - 0.50)
     severity: 'medium',
@@ -38,7 +38,7 @@ const MOCK_DEMO_ZONES = [
   },
   {
     id: 'DEMO_03',
-    location: 'Phường Phú Hậu',
+    location: 'Phường Phú Hậu (Demo L3)',
     district: 'Thừa Thiên Huế',
     level: '0.80', // Level 3 (0.51 - 1.00)
     severity: 'high',
@@ -48,7 +48,7 @@ const MOCK_DEMO_ZONES = [
   },
   {
     id: 'DEMO_04',
-    location: 'Phường Xuân Phú',
+    location: 'Phường Xuân Phú (Demo L4)',
     district: 'Thừa Thiên Huế',
     level: '1.50', // Level 4 (1.01 - 2.00)
     severity: 'critical',
@@ -58,7 +58,7 @@ const MOCK_DEMO_ZONES = [
   },
   {
     id: 'DEMO_05',
-    location: 'Phường Hương Sơ',
+    location: 'Phường Hương Sơ (Demo L5)',
     district: 'Thừa Thiên Huế',
     level: '2.50', // Level 5 (> 2.00)
     severity: 'critical',
