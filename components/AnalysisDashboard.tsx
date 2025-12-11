@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StatCard } from './StatCard';
 import { FloodTrendChart } from './FloodTrendChart';
 import { ReliefGroupChart, TimeFrame } from './ReliefGroupChart';
+import { SensorChart } from './SensorChart';
 
 type ViewMode = 'day' | 'week' | 'month';
 
@@ -158,9 +159,14 @@ export const AnalysisDashboard = () => {
             ))}
           </div>
 
-          {/* Flood Trend full width */}
-          <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[450px] flex flex-col mb-6">
-            <FloodTrendChart viewMode={viewMode} />
+          {/* Flood trend and sensor charts share the same row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[450px] flex flex-col">
+              <FloodTrendChart viewMode={viewMode} />
+            </div>
+            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[420px]">
+              <SensorChart />
+            </div>
           </div>
 
           {/* Relief chart full width */}
