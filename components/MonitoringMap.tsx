@@ -15,6 +15,59 @@ const getRandomCoord = () => {
     return [lat, lng];
 };
 
+const MOCK_DEMO_ZONES = [
+  {
+    id: 'DEMO_01',
+    location: 'Phường Vĩnh Ninh (Demo L1)',
+    district: 'Thừa Thiên Huế',
+    level: '0.25', // Level 1 (0.10 - 0.30)
+    severity: 'medium', 
+    status: 'stable',
+    timestamp: Date.now(),
+    bounds: { minlat: 16.455, maxlat: 16.460, minlon: 107.585, maxlon: 107.590 }
+  },
+  {
+    id: 'DEMO_02',
+    location: 'Phường Thuận Lộc (Demo L2)',
+    district: 'Thừa Thiên Huế',
+    level: '0.45', // Level 2 (0.31 - 0.50)
+    severity: 'medium',
+    status: 'rising',
+    timestamp: Date.now(),
+    bounds: { minlat: 16.470, maxlat: 16.475, minlon: 107.580, maxlon: 107.585 }
+  },
+  {
+    id: 'DEMO_03',
+    location: 'Phường Phú Hậu (Demo L3)',
+    district: 'Thừa Thiên Huế',
+    level: '0.80', // Level 3 (0.51 - 1.00)
+    severity: 'high',
+    status: 'rising',
+    timestamp: Date.now(),
+    bounds: { minlat: 16.465, maxlat: 16.470, minlon: 107.600, maxlon: 107.605 }
+  },
+  {
+    id: 'DEMO_04',
+    location: 'Phường Xuân Phú (Demo L4)',
+    district: 'Thừa Thiên Huế',
+    level: '1.50', // Level 4 (1.01 - 2.00)
+    severity: 'critical',
+    status: 'rising',
+    timestamp: Date.now(),
+    bounds: { minlat: 16.455, maxlat: 16.460, minlon: 107.605, maxlon: 107.610 }
+  },
+  {
+    id: 'DEMO_05',
+    location: 'Phường Hương Sơ (Demo L5)',
+    district: 'Thừa Thiên Huế',
+    level: '2.50', // Level 5 (> 2.00)
+    severity: 'critical',
+    status: 'rising',
+    timestamp: Date.now(),
+    bounds: { minlat: 16.480, maxlat: 16.485, minlon: 107.575, maxlon: 107.580 }
+  }
+];
+
 const MOCK_RESCUE_TEAMS = [
     { id: 'RT01', name: 'Đội CH Phường Phú Hội', type: 'boat', status: 'busy', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
     { id: 'RT02', name: 'Cảnh sát PCCC & CNCH', type: 'truck', status: 'idle', ...(() => { const c = getRandomCoord(); return { lat: c[0], lng: c[1] } })() },
@@ -221,6 +274,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
       });
   };
 
+  // Inject Mock Data on Mount
+  useEffect(() => {
+    if (onCriticalZonesUpdate) {
+        onCriticalZonesUpdate(MOCK_DEMO_ZONES);
+    }
+  }, []); // Run once on mount
+
   // Initialize Map - Center on Hue
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
@@ -398,7 +458,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 
                 json.data.forEach(item => {
                     const id = item.id;
-                    const newDepthMm = item.depth * 1000 || 0;
+                    const newDepthMm = item.depth || 0;
                     const oldDepthMm = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepthMm;
                     
                     // Update Flood Status Ref

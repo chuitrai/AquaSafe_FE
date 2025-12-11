@@ -1,0 +1,89 @@
+{
+  "flood_response_config": [
+    {
+      "level_id": 1,
+      "min_level": 0.10,
+      "max_level": 0.30,
+      "actions": [
+        { "id": 101, "content": "Kích hoạt máy bơm dã chiến" },
+        { "id": 102, "content": "Cử công nhân khơi thông miệng cống" },
+        { "id": 103, "content": "Mở cửa van xả một chiều" },
+        { "id": 104, "content": "Kiểm tra vận hành cống ngăn triều" },
+        { "id": 105, "content": "Cảnh báo trơn trượt cho người đi đường" },
+        { "id": 106, "content": "Bật biển báo đèn LED cảnh báo ngập" },
+        { "id": 107, "content": "Điều tiết giao thông giảm tốc độ" },
+        { "id": 108, "content": "Chuẩn bị sẵn bao cát tại các hầm" },
+        { "id": 109, "content": "Gửi thông báo cảnh báo ngập qua App cư dân" },
+        { "id": 110, "content": "Huy động lực lượng dân phòng trực chốt" }
+      ]
+    },
+    {
+      "level_id": 2,
+      "min_level": 0.31,
+      "max_level": 0.50,
+      "actions": [
+        { "id": 201, "content": "Khuyến cáo xe máy hạn chế đi vào" },
+        { "id": 202, "content": "Kê cao đồ đạc lên tầng 1" },
+        { "id": 203, "content": "Cấm xe máy, chỉ cho ô tô gầm cao qua" },
+        { "id": 204, "content": "Phân luồng giao thông sang đường khác" },
+        { "id": 205, "content": "Bố trí xe cứu hộ kéo xe chết máy" },
+        { "id": 206, "content": "Ngắt điện các tủ điện đặt thấp" },
+        { "id": 207, "content": "Gia cố đê bao tạm thời" },
+        { "id": 208, "content": "Đóng cửa các trường mầm non tầng trệt" },
+        { "id": 209, "content": "Dựng vách ngăn chống nước vào hầm" },
+        { "id": 210, "content": "Cấm toàn bộ phương tiện vào vùng trũng" }
+      ]
+    },
+    {
+      "level_id": 3,
+      "min_level": 0.51,
+      "max_level": 1.00,
+      "actions": [
+        { "id": 301, "content": "Cắt điện lưới toàn khu vực ngập" },
+        { "id": 302, "content": "Sơ tán người già và trẻ em" },
+        { "id": 303, "content": "Huy động xe tải quân sự chở dân" },
+        { "id": 304, "content": "Di dời gia súc/vật nuôi lên cao" },
+        { "id": 305, "content": "Neo đậu tàu thuyền vào vị trí an toàn" },
+        { "id": 306, "content": "Chuẩn bị lương thực dự trữ tại chỗ" },
+        { "id": 307, "content": "Đóng cửa các chợ ven sông" },
+        { "id": 308, "content": "Mở cửa trường học làm nơi tránh trú" },
+        { "id": 309, "content": "Cung cấp áo phao cho từng hộ dân" },
+        { "id": 310, "content": "Di dời trạm y tế lên điểm cao" }
+      ]
+    },
+    {
+      "level_id": 4,
+      "min_level": 1.01,
+      "max_level": 2.00,
+      "actions": [
+        { "id": 401, "content": "Hạ barie phong tỏa ngầm tràn" },
+        { "id": 402, "content": "Điều cano/xuồng cao su cứu hộ" },
+        { "id": 403, "content": "Cấm tuyệt đối người dân ra đường" },
+        { "id": 404, "content": "Sơ tán cưỡng chế các hộ ven sông" },
+        { "id": 405, "content": "Kêu gọi chi viện lực lượng quân đội" },
+        { "id": 406, "content": "Thiết lập cầu hàng không tiếp tế" },
+        { "id": 407, "content": "Bố trí chốt gác cảnh báo sạt lở" },
+        { "id": 408, "content": "Di dời khẩn cấp kho lúa/gạo" },
+        { "id": 409, "content": "Cử đội người nhái tìm kiếm cứu nạn" },
+        { "id": 410, "content": "Kích hoạt quy trình thảm họa cấp tỉnh" }
+      ]
+    },
+    {
+      "level_id": 5,
+      "min_level": 2.01,
+      "max_level": 10.00,
+      "actions": [
+        { "id": 501, "content": "Yêu cầu trực thăng cứu hộ khẩn cấp" },
+        { "id": 502, "content": "Huy động toàn bộ thuyền bè dân sự" },
+        { "id": 503, "content": "Di dân lên đỉnh đồi/núi cao nhất" },
+        { "id": 504, "content": "Phong tỏa toàn diện bán kính 5km" },
+        { "id": 505, "content": "Cung cấp nước sạch/thuốc men thả dù" },
+        { "id": 506, "content": "Tuyên bố tình trạng khẩn cấp quốc gia" },
+        { "id": 507, "content": "Sơ tán toàn địa bàn ngay lập tức" },
+        { "id": 508, "content": "Cắt cử lực lượng hộ đê đặc biệt" },
+        { "id": 509, "content": "Di tản dân vào sâu trong đất liền" },
+        { "id": 510, "content": "Thiết lập bệnh viện dã chiến vùng cao" }
+      ]
+    }
+  ]
+}
