@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { MonitoringDashboard } from './components/MonitoringDashboard';
 import { LoginPage } from './components/LoginPage';
+import { ResourceResponseModal } from './components/ResourceResponseModal';
 
 const App = () => {
   // Views: 'monitoring', 'analysis', 'login'
@@ -16,6 +17,9 @@ const App = () => {
   const [searchLocation, setSearchLocation] = useState(null);
   // State to hold selected timeframe
   const [timeFrame, setTimeFrame] = useState({ id: 'now', label: 'Hiện tại' });
+
+  // Resource Request Response Modal State
+  const [resourceModalData, setResourceModalData] = useState({ isOpen: false, request: null });
 
   const handleLocationSelect = (location) => {
     setSearchLocation(location);
@@ -65,6 +69,10 @@ const App = () => {
       }
   };
 
+  const handleOpenResourceResponse = (requestItem) => {
+      setResourceModalData({ isOpen: true, request: requestItem });
+  };
+
   // If in Login View, render full page Login
   if (currentView === 'login') {
       return (
@@ -85,6 +93,7 @@ const App = () => {
         onTimeFrameChange={setTimeFrame}
         isLoggedIn={isLoggedIn}
         onLoginToggle={handleLoginToggle}
+        onOpenResourceResponse={handleOpenResourceResponse}
       />
       
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -99,6 +108,15 @@ const App = () => {
             />
         )}
       </main>
+
+      {/* Resource Response Modal - Global Level */}
+      {isLoggedIn && (
+        <ResourceResponseModal 
+            isOpen={resourceModalData.isOpen}
+            onClose={() => setResourceModalData({ ...resourceModalData, isOpen: false })}
+            request={resourceModalData.request}
+        />
+      )}
     </div>
   );
 };
