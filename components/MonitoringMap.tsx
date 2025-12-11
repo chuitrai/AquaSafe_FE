@@ -193,13 +193,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           return;
       }
 
-      let totalDepthMm = 0;
+      let totalDepth = 0;
       let totalPopulation = 0;
       let validDepthCount = 0;
 
       ids.forEach(id => {
           const depth = statusMap[id] || 0;
-          totalDepthMm += depth;
+          totalDepth += depth;
           validDepthCount++;
           
           if (popMap[id]) {
@@ -207,7 +207,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           }
       });
 
-      const avgFloodDepthMm = validDepthCount > 0 ? totalDepthMm / validDepthCount : 0;
+      const avgFloodDepth = validDepthCount > 0 ? totalDepth / validDepthCount : 0;
       
       if (totalPopulation === 0 && validDepthCount > 0) {
           totalPopulation = validDepthCount * 5000; 
@@ -215,7 +215,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
 
       onStatsUpdate({
           population: totalPopulation,
-          avgFloodLevel: (avgFloodDepthMm / 1000).toFixed(2),
+          avgFloodLevel: avgFloodDepth.toFixed(2),
           food: (totalPopulation * 0.05 / 1000).toFixed(1),
           workers: Math.floor(totalPopulation / 1000) + 20
       });
@@ -381,7 +381,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
           });
       }
 
-  }, [activeLayers]); // Re-run when activeLayers changes
+  }, [activeLayers]); 
 
   // Polling Flood Depth Status & Update Zones
   useEffect(() => {
@@ -398,46 +398,44 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 
                 json.data.forEach(item => {
                     const id = item.id;
-                    const newDepthMm = item.depth || 0;
-                    const oldDepthMm = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepthMm;
+                    const newDepth = item.depth || 0; // Unit: meters
+                    const oldDepth = floodStatusRef.current[id] !== undefined ? floodStatusRef.current[id] : newDepth;
                     
                     // Update Flood Status Ref
-                    floodStatusRef.current[id] = newDepthMm;
+                    floodStatusRef.current[id] = newDepth;
 
                     // If we don't have population data for this ID, mark it for fetching
                     if (populationCacheRef.current[id] === undefined) {
-                        idsToFetch.push({ id, depthMm: newDepthMm });
+                        idsToFetch.push({ id, depth: newDepth });
                     }
 
                     // Logic to detect changes for Critical Zones
-                    const isRising = newDepthMm > oldDepthMm;
-                    const isFalling = newDepthMm < oldDepthMm;
+                    const isRising = newDepth > oldDepth;
+                    const isFalling = newDepth < oldDepth;
                     
-                    // Determine Severity
+                    // Determine Severity - Update thresholds for meters
                     let severity = 'low';
-                    if (newDepthMm > 1000) severity = 'critical'; // > 1m
-                    else if (newDepthMm > 500) severity = 'high'; // > 0.5m
-                    else if (newDepthMm > 200) severity = 'medium'; // > 0.2m
+                    if (newDepth > 1.0) severity = 'critical'; // > 1m
+                    else if (newDepth > 0.5) severity = 'high'; // > 0.5m
+                    else if (newDepth > 0.2) severity = 'medium'; // > 0.2m
 
                     // Check if this zone is already being tracked
                     const existingZone = zones.find(z => z.id === id);
 
                     if (existingZone) {
                         // Only update if there is a change in depth or status
-                        if (isRising || isFalling || existingZone.level !== (newDepthMm / 1000).toFixed(1)) {
+                        if (isRising || isFalling || existingZone.level !== newDepth.toFixed(2)) {
                             updates.push({
                                 ...existingZone,
-                                level: (newDepthMm / 1000).toFixed(1),
+                                level: newDepth.toFixed(2),
                                 severity: severity,
                                 status: isRising ? 'rising' : (isFalling ? 'falling' : 'stable'),
                                 timestamp: Date.now() 
                             });
                         }
-                    } else if (newDepthMm > 200) {
-                        // New potential zone (only care if > 200mm to avoid spam in sidebar)
-                        // This logic is separate from fetching details for population
-                        // We will let the "idsToFetch" logic handle data retrieval, 
-                        // but here we mark it as "needs zone creation"
+                    } else if (newDepth > 0.2) {
+                        // New potential zone (> 0.2m)
+                        // Data fetch logic handles actual zone creation via onCriticalZonesUpdate in fetchZoneDetails
                     }
                 });
 
@@ -447,10 +445,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 }
 
                 // Fetch details for ALL new IDs (to get population for global stats)
-                // We process them in parallel
                 if (idsToFetch.length > 0) {
-                    // Fetch all missing details to build accurate global stats
-                    Promise.all(idsToFetch.map(item => fetchZoneDetails(item.id, item.depthMm)));
+                    Promise.all(idsToFetch.map(item => fetchZoneDetails(item.id, item.depth)));
                 }
             }
         } catch (err) {
@@ -458,7 +454,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         }
     };
 
-    const fetchZoneDetails = async (id, depthMm) => {
+    const fetchZoneDetails = async (id, depth) => {
         try {
             const res = await fetch(`${API_BASE_URL}/admin/get-board/${id}`, {
                 headers: getAuthHeaders()
@@ -469,7 +465,8 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 const { tags, bounds } = json.data;
                 const name = tags.name || `Khu vực #${id}`;
                 const province = "Thừa Thiên Huế"; 
-                const levelM = (depthMm / 1000).toFixed(1);
+                // Depth is already in meters
+                const levelM = depth.toFixed(2);
                 
                 // 1. Cache Population
                 let pop = 0;
@@ -480,11 +477,11 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 if (isNaN(pop)) pop = 0;
                 populationCacheRef.current[id] = pop;
 
-                // 2. Create Critical Zone if severity matches
+                // 2. Create Critical Zone if severity matches (Meters thresholds)
                 let severity = 'low';
-                if (depthMm > 1000) severity = 'critical';
-                else if (depthMm > 500) severity = 'high';
-                else if (depthMm > 200) severity = 'medium';
+                if (depth > 1.0) severity = 'critical';
+                else if (depth > 0.5) severity = 'high';
+                else if (depth > 0.2) severity = 'medium';
 
                 if (severity !== 'low') {
                     const newZone = {
@@ -541,14 +538,13 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         if (marker) marker.openPopup();
         
         // Update stats for the specific zone
-        // We use cached population if available
         const pop = populationCacheRef.current[selectedZoneId] || 0;
-        const depthMm = floodStatusRef.current[selectedZoneId] || (parseFloat(selectedZone.level) * 1000);
+        const depth = floodStatusRef.current[selectedZoneId] || parseFloat(selectedZone.level);
         
         if (onStatsUpdate) {
              onStatsUpdate({
                 population: pop,
-                avgFloodLevel: (depthMm / 1000).toFixed(2),
+                avgFloodLevel: depth.toFixed(2),
                 food: (pop * 0.05 / 1000).toFixed(1),
                 workers: Math.floor(pop / 1000) + 5
             });
@@ -713,7 +709,6 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                 try {
                     // Check cache first for population
                     let pop = populationCacheRef.current[ward.id];
-                    console.log("Ward ID:", ward.id, "Cached Population:", pop);
                     let detailJson;
 
                     // If not in cache or we need geometry anyway, fetch it
@@ -751,28 +746,27 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     
                     if (pop === undefined) pop = 0;
 
-                    let depthMm = 0;
+                    let depth = 0;
                     if (floodStatusRef.current && floodStatusRef.current[ward.id] !== undefined) {
-                        depthMm = floodStatusRef.current[ward.id];
+                        depth = floodStatusRef.current[ward.id];
                     } else if (detailJson?.data?.tags?.flood_depth) {
-                        depthMm = parseFloat(detailJson.data.tags.flood_depth);
+                        depth = parseFloat(detailJson.data.tags.flood_depth);
                     }
-                    if (isNaN(depthMm)) depthMm = 0;
+                    if (isNaN(depth)) depth = 0;
 
-                    return { pop, depthMm };
+                    return { pop, depth };
                 } catch (err) { }
-                return { pop: 0, depthMm: 0 };
+                return { pop: 0, depth: 0 };
             });
 
             const results = await Promise.all(fetchPromises);
             
             const totalPopulation = results.reduce((sum, current) => sum + current.pop, 0);
-            const totalDepthMm = results.reduce((sum, curr) => sum + curr.depthMm, 0);
-            const validCount = results.filter(r => r.depthMm > 0 || r.pop > 0).length; // Rough filter for average
-            const avgFloodDepthMm = validCount > 0 ? totalDepthMm / validCount : 0;
-            const avgFloodDepthM = avgFloodDepthMm / 1000;
+            const totalDepth = results.reduce((sum, curr) => sum + curr.depth, 0);
+            const validCount = results.filter(r => r.depth > 0 || r.pop > 0).length;
+            const avgFloodDepth = validCount > 0 ? totalDepth / validCount : 0;
 
-            return { totalPopulation, avgFloodDepth: avgFloodDepthM };
+            return { totalPopulation, avgFloodDepth: avgFloodDepth };
         }
     } catch (error) {
         if (error.name !== 'AbortError') console.error("Error fetching borders:", error);
