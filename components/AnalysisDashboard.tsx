@@ -1,151 +1,76 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StatCard } from './StatCard';
 import { FloodTrendChart } from './FloodTrendChart';
-import { ReliefGroupChart, TimeFrame } from './ReliefGroupChart';
+import { MapSection } from './MapSection';
 import { SensorChart } from './SensorChart';
+import { ReliefGroupChart } from './ReliefGroupChart';
 
-type ViewMode = 'day' | 'week' | 'month';
-
-interface DashboardStat {
-  title: string;
-  value: string;
-  unit?: string;
-  icon: string;
-}
-
-const statsByMode: Record<ViewMode, DashboardStat[]> = {
-  day: [
+export const AnalysisDashboard = () => {
+  const stats = [
     {
       title: 'Mức độ ngập trung bình',
       value: '25.4',
       unit: 'cm',
+      change: 5.2,
+      trend: 'down',
       icon: 'water'
     },
     {
       title: 'Dân số trong vùng ngập',
       value: '1,283',
+      change: 15,
+      trend: 'up',
       icon: 'groups'
     },
     {
-      title: 'Nhân viên cứu hộ',
-      value: '200',
+      title: 'Người cứu trợ (Online)',
+      value: '125',
+      change: 8,
+      trend: 'up',
       icon: 'health_and_safety'
     },
     {
       title: 'Người được cứu trợ',
       value: '312',
+      change: 20,
+      trend: 'up',
       icon: 'volunteer_activism'
     },
     {
       title: 'Lương thực đã phát',
-      value: '2,000',
+      value: '1,500',
       unit: 'kg',
+      change: 10,
+      trend: 'up',
       icon: 'restaurant'
     }
-  ],
-  week: [
-    {
-      title: 'Mức độ ngập trung bình',
-      value: '22.1',
-      unit: 'cm',
-      icon: 'water'
-    },
-    {
-      title: 'Dân số trong vùng ngập',
-      value: '8,920',
-      icon: 'groups'
-    },
-    {
-      title: 'Nhân viên cứu hộ',
-      value: '970',
-      icon: 'health_and_safety'
-    },
-    {
-      title: 'Người được cứu trợ',
-      value: '1,420',
-      icon: 'volunteer_activism'
-    },
-    {
-      title: 'Lương thực đã phát',
-      value: '14,500',
-      unit: 'kg',
-      icon: 'restaurant'
-    }
-  ],
-  month: [
-    {
-      title: 'Mức độ ngập trung bình',
-      value: '18.7',
-      unit: 'cm',
-      icon: 'water'
-    },
-    {
-      title: 'Dân số trong vùng ngập',
-      value: '30,210',
-      icon: 'groups'
-    },
-    {
-      title: 'Nhân viên cứu hộ',
-      value: '4,100',
-      icon: 'health_and_safety'
-    },
-    {
-      title: 'Người được cứu trợ',
-      value: '5,800',
-      icon: 'volunteer_activism'
-    },
-    {
-      title: 'Lương thực đã phát',
-      value: '64,000',
-      unit: 'kg',
-      icon: 'restaurant'
-    }
-  ]
-};
-const viewModes: ViewMode[] = ['day', 'week', 'month'];
-
-const mapViewModeToTimeFrame = (mode: ViewMode): TimeFrame => {
-  switch (mode) {
-    case 'day':
-      return 'day';
-    case 'week':
-      return 'month';
-    default:
-      return 'year';
-  }
-};
-
-export const AnalysisDashboard = () => {
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
-  const stats = statsByMode[viewMode];
+  ];
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
         {/* Dashboard Toolbar */}
         <div className="flex flex-wrap justify-between items-center gap-4 px-6 py-4 border-b border-border-color bg-card-bg shrink-0">
-          <div>
-            <h1 className="text-xl font-bold text-text-primary">Phân Tích Dữ Liệu Ngập Lụt</h1>
-            <p className="text-xs text-text-muted">Theo dõi các xu hướng nước và cứu trợ trong vùng.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-1 rounded-lg bg-background p-1 border border-border-color">
-              {viewModes.map(mode => (
-                <button
-                  key={mode}
-                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                    viewMode === mode
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-text-secondary hover:bg-white hover:shadow-sm'
-                  }`}
-                  onClick={() => setViewMode(mode)}
-                >
-                  {mode === 'day' ? 'Ngày' : mode === 'week' ? 'Tuần' : 'Tháng'}
-                </button>
-              ))}
-            </div>
-            <button className="flex h-9 items-center justify-center gap-x-2 rounded-md bg-primary text-white px-4 text-sm font-bold hover:bg-primary-dark transition-colors shadow-sm">
+          <h1 className="text-xl font-bold text-text-primary">Phân Tích Dữ Liệu Ngập Lụt</h1>
+          
+          <div className="flex items-center gap-3">
+            <button type="button" className="flex h-9 items-center justify-center gap-x-2 rounded-md border border-border-color bg-white px-3 text-sm font-medium text-text-secondary hover:bg-gray-50 transition-colors shadow-sm">
+              <span className="material-symbols-outlined !text-[20px]">calendar_today</span>
+              <span>Last 30 days</span>
+              <span className="material-symbols-outlined !text-[20px]">arrow_drop_down</span>
+            </button>
+            
+            <button type="button" className="flex h-9 items-center justify-center gap-x-2 rounded-md border border-border-color bg-white px-3 text-sm font-medium text-text-secondary hover:bg-gray-50 transition-colors shadow-sm">
+              <span className="material-symbols-outlined !text-[20px]">filter_list</span>
+              <span>Bộ lọc nâng cao</span>
+            </button>
+            
+            <button type="button" className="flex h-9 items-center justify-center gap-x-2 rounded-md bg-primary text-white px-4 text-sm font-bold hover:bg-primary-dark transition-colors shadow-sm">
               <span className="material-symbols-outlined !text-[20px]">download</span>
               <span className="truncate">Xuất Báo cáo</span>
+            </button>
+            
+            <button type="button" className="flex h-9 w-9 items-center justify-center rounded-md border border-border-color bg-white text-text-secondary hover:bg-gray-50 shadow-sm" title="Thời tiết">
+              <span className="material-symbols-outlined !text-[20px]">thermostat</span>
             </button>
           </div>
         </div>
@@ -159,19 +84,27 @@ export const AnalysisDashboard = () => {
             ))}
           </div>
 
-          {/* Flood trend and sensor charts share the same row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[450px] flex flex-col">
-              <FloodTrendChart viewMode={viewMode} />
+          {/* Main Grid: 2x2 Layout for Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
+            {/* Chart 1: Flood Trend */}
+            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[400px]">
+              <FloodTrendChart />
             </div>
-            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[420px]">
+            
+            {/* Chart 2: Map */}
+            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[400px] flex flex-col">
+              <MapSection />
+            </div>
+
+            {/* Chart 3: Sensor Trends */}
+            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[400px]">
               <SensorChart />
             </div>
-          </div>
 
-          {/* Relief chart full width */}
-          <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[500px]">
-            <ReliefGroupChart timeFrame={mapViewModeToTimeFrame(viewMode)} />
+            {/* Chart 4: Relief Efficiency */}
+            <div className="rounded-xl border border-border-color bg-card-bg p-6 shadow-sm min-h-[400px] flex flex-col">
+              <ReliefGroupChart />
+            </div>
           </div>
         </div>
     </div>
