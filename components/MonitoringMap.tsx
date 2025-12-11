@@ -95,7 +95,7 @@ const getConvexHull = (points) => {
     return lower.concat(upper);
 };
 
-export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, onCriticalZonesUpdate, searchLocation, timeFrame, activeLayers, isLoggedIn, token }) => {
+export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpdate, onCriticalZonesUpdate, searchLocation, timeFrame, activeLayers, isLoggedIn, token, onOpenAlertModal }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
@@ -153,6 +153,23 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
   useEffect(() => {
     isPointSelectionModeRef.current = isPointSelectionMode;
   }, [isPointSelectionMode]);
+
+  // Handle Event Delegation for Alert Buttons in Popups
+  useEffect(() => {
+    const handleAlertClick = (e) => {
+      const btn = e.target.closest('.send-alert-btn');
+      if (btn) {
+        const zoneId = btn.getAttribute('data-zone-id');
+        const zone = zones.find(z => z.id.toString() === zoneId);
+        if (zone && onOpenAlertModal) {
+          onOpenAlertModal(zone);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleAlertClick);
+    return () => document.removeEventListener('click', handleAlertClick);
+  }, [zones, onOpenAlertModal]);
 
   // Helper to get headers
   const getAuthHeaders = () => {
@@ -1042,6 +1059,12 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
                     <span class="text-gray-600 text-xs font-semibold">Mực nước:</span>
                     <span class="font-bold text-red-600 text-sm">${zone.level}m</span>
                 </div>
+                ${isLoggedIn ? `
+                <button class="send-alert-btn w-full mt-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-1.5 px-2 rounded border border-red-200 flex items-center justify-center gap-1 transition-colors" data-zone-id="${zone.id}">
+                    <span class="material-symbols-outlined !text-[14px] pointer-events-none">campaign</span>
+                    Gửi cảnh báo tới UBND
+                </button>
+                ` : ''}
             </div>
           `;
           marker.bindPopup(popupContent, { closeButton: false, className: 'custom-popup', offset: [0, -10] });
@@ -1055,7 +1078,7 @@ export const MonitoringMap = ({ zones, selectedZoneId, onZoneSelect, onStatsUpda
         polygonLayersRef.current[selectedZoneId].addTo(map);
     }
 
-  }, [zones, selectedZoneId, onZoneSelect]); // Removed isSelectionMode from deps to prevent re-render
+  }, [zones, selectedZoneId, onZoneSelect, isLoggedIn]); 
 
   return (
     <div className="absolute inset-0 w-full h-full bg-gray-200">
