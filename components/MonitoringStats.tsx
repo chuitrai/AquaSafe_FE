@@ -51,7 +51,7 @@ export const MonitoringStats = ({ data }) => {
                 <p className="text-xs font-bold uppercase tracking-wider">Lương thực</p>
             </div>
             <p className="text-3xl font-bold text-gray-800 tracking-tight">
-                 {isDataAvailable ? `${data.food} ` : "N/A "}
+                 {isDataAvailable ? `${Math.floor(data.food/2)} ` : "N/A "}
                  {isDataAvailable && <span className="text-lg text-gray-500 font-medium">tấn</span>}
             </p>
             {isDataAvailable && (
@@ -69,7 +69,7 @@ export const MonitoringStats = ({ data }) => {
                 <p className="text-xs font-bold uppercase tracking-wider">Nhân viên cứu hộ</p>
             </div>
             <p className="text-3xl font-bold text-gray-800 tracking-tight">
-                {isDataAvailable ? formatNumber(data.workers) : "N/A"}
+                {isDataAvailable ? formatNumber(Math.floor(data.workers/10)) : "N/A"}
             </p>
             {isDataAvailable && (
                 <p className="text-xs font-semibold text-gray-400 flex items-center gap-1">
