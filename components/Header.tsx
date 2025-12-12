@@ -61,7 +61,7 @@ const MOCK_NOTIFICATIONS = [
     }
 ];
 
-export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange, isLoggedIn, onLoginToggle, onOpenResourceResponse, user }) => {
+export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame, onTimeFrameChange, isLoggedIn, onLoginToggle, onOpenResourceResponse }) => {
   const isMonitoring = currentView === 'monitoring';
   
   // Search State
@@ -367,8 +367,8 @@ export const Header = ({ currentView, onViewChange, onLocationSelect, timeFrame,
              <>
                 {!isMonitoring && (
                     <div className="text-right hidden sm:block">
-                    <p className="text-sm font-bold text-text-primary">{user?.username || 'Nguyễn Văn A'}</p>
-                    <p className="text-xs text-text-secondary">{user?.role || 'Cán bộ quản lý'}</p>
+                    <p className="text-sm font-bold text-text-primary">Nguyễn Văn A</p>
+                    <p className="text-xs text-text-secondary">Cán bộ quản lý</p>
                     </div>
                 )}
                 <div 
