@@ -1,86 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { MonitoringDashboard } from './components/MonitoringDashboard';
 import { LoginPage } from './components/LoginPage';
 import { ResourceResponseModal } from './components/ResourceResponseModal';
+import { useAuth } from './hooks/useAuth';
 
 const App = () => {
-  // Views: 'monitoring', 'analysis', 'login'
   const [currentView, setCurrentView] = useState('monitoring');
   
-  // Authentication State
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [token, setToken] = useState(null);
+  // Use Auth Hook for persistence
+  const { isLoggedIn, token, user, login, logout, isLoading: isAuthLoading } = useAuth();
   
-  // State to hold the coordinates selected from the search bar
   const [searchLocation, setSearchLocation] = useState(null);
-  // State to hold selected timeframe
   const [timeFrame, setTimeFrame] = useState({ id: 'now', label: 'Hiện tại' });
-
-  // Resource Request Response Modal State
   const [resourceModalData, setResourceModalData] = useState({ isOpen: false, request: null });
+
+  // Redirect to analysis if already logged in and view is login
+  useEffect(() => {
+      if (isLoggedIn && currentView === 'login') {
+          setCurrentView('analysis');
+      }
+  }, [isLoggedIn, currentView]);
 
   const handleLocationSelect = (location) => {
     setSearchLocation(location);
-    if (currentView !== 'monitoring') {
-        setCurrentView('monitoring');
-    }
+    if (currentView !== 'monitoring') setCurrentView('monitoring');
   };
 
   const handleLoginToggle = () => {
     if (isLoggedIn) {
-      // Logout logic: Reset ALL states
-      setIsLoggedIn(false);
-      setToken(null);
-      setSearchLocation(null);
-      setTimeFrame({ id: 'now', label: 'Hiện tại' });
+      logout();
       setCurrentView('monitoring');
     } else {
-      // Go to Login Page
       setCurrentView('login');
     }
   };
 
   const handleLoginSubmit = async (username, password, callback) => {
-      try {
-          const response = await fetch('http://localhost:8220/api/auth/login', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ username, password }),
-          });
-
-          if (response.ok) {
-              const data = await response.json();
-              // Store token
-              setToken(data.token);
-              
-              setIsLoggedIn(true);
-              setCurrentView('analysis'); // Redirect to analysis dashboard on success
-              callback(true);
-          } else {
-              callback(false);
-          }
-      } catch (error) {
-          console.error("Login API error:", error);
-          callback(false);
-      }
+      const result = await login(username, password);
+      callback(result.success);
+      if(result.success) setCurrentView('analysis');
   };
 
-  const handleOpenResourceResponse = (requestItem) => {
-      setResourceModalData({ isOpen: true, request: requestItem });
-  };
+  // Prevent flash of content while checking localstorage
+  if (isAuthLoading) return null;
 
-  // If in Login View, render full page Login
   if (currentView === 'login') {
-      return (
-          <LoginPage 
-            onLogin={handleLoginSubmit} 
-            onBack={() => setCurrentView('monitoring')} 
-          />
-      );
+      return <LoginPage onLogin={handleLoginSubmit} onBack={() => setCurrentView('monitoring')} />;
   }
 
   return (
@@ -93,7 +60,8 @@ const App = () => {
         onTimeFrameChange={setTimeFrame}
         isLoggedIn={isLoggedIn}
         onLoginToggle={handleLoginToggle}
-        onOpenResourceResponse={handleOpenResourceResponse}
+        onOpenResourceResponse={(item) => setResourceModalData({ isOpen: true, request: item })}
+        user={user}
       />
       
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -109,7 +77,6 @@ const App = () => {
         )}
       </main>
 
-      {/* Resource Response Modal - Global Level */}
       {isLoggedIn && (
         <ResourceResponseModal 
             isOpen={resourceModalData.isOpen}
